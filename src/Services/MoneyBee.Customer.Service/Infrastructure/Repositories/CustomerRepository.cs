@@ -44,13 +44,6 @@ public class CustomerRepository : ICustomerRepository
             .ToListAsync();
     }
 
-    public async Task<IEnumerable<CustomerEntity>> FindAsync(ISpecification<CustomerEntity> specification)
-    {
-        return await _context.Customers
-            .Where(specification.ToExpression())
-            .ToListAsync();
-    }
-
     public async Task<CustomerEntity> CreateAsync(CustomerEntity customer)
     {
         _context.Customers.Add(customer);

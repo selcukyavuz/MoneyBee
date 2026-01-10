@@ -52,13 +52,6 @@ public class TransferRepository : ITransferRepository
             .SumAsync(t => t.AmountInTRY);
     }
 
-    public async Task<IEnumerable<TransferEntity>> FindAsync(ISpecification<TransferEntity> specification)
-    {
-        return await _context.Transfers
-            .Where(specification.ToExpression())
-            .ToListAsync();
-    }
-
     public async Task<TransferEntity> CreateAsync(TransferEntity transfer)
     {
         _context.Transfers.Add(transfer);

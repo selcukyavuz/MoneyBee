@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using MoneyBee.Common.DDD;
-using MoneyBee.Common.Persistence;
 using CustomerEntity = MoneyBee.Customer.Service.Domain.Entities.Customer;
 using MoneyBee.Common.Enums;
 
@@ -13,7 +12,6 @@ public class CustomerDbContext : DbContext
     }
 
     public DbSet<CustomerEntity> Customers { get; set; }
-    public DbSet<OutboxMessage> OutboxMessages { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -23,48 +21,7 @@ public class CustomerDbContext : DbContext
         modelBuilder.Ignore<DomainEvent>();
         modelBuilder.Ignore<AggregateRoot>();
 
-        // Configure OutboxMessage
-        modelBuilder.Entity<OutboxMessage>(entity =>
-        {
-            entity.ToTable("outbox_messages");
-            
-            entity.HasKey(e => e.Id);
-            
-            entity.Property(e => e.EventType)
-                .HasColumnName("event_type")
-                .HasMaxLength(200)
-                .IsRequired();
-            
-            entity.Property(e => e.EventData)
-                .HasColumnName("event_data")
-                .IsRequired();
-            
-            entity.Property(e => e.OccurredOn)
-                .HasColumnName("occurred_on");
-            
-            entity.Property(e => e.Published)
-                .HasColumnName("published")
-                .HasDefaultValue(false);
-            
-            entity.Property(e => e.PublishedAt)
-                .HasColumnName("published_at");
-            
-            entity.Property(e => e.ProcessAttempts)
-                .HasColumnName("process_attempts")
-                .HasDefaultValue(0);
-            
-            entity.Property(e => e.LastError)
-                .HasColumnName("last_error")
-                .HasMaxLength(2000);
-            
-            entity.Property(e => e.LastAttemptAt)
-                .HasColumnName("last_attempt_at");
-            
-            // Indexes for efficient querying
-            entity.HasIndex(e => new { e.Published, e.OccurredOn })
-                .HasDatabaseName("ix_outbox_messages_published_occurred");
-        });
-
+        // Configure Customer
         modelBuilder.Entity<CustomerEntity>(entity =>
         {
             entity.ToTable("customers");

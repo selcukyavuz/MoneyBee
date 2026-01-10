@@ -1,10 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using MoneyBee.Common.DDD;
-using MoneyBee.Common.Persistence;
 using MoneyBee.Common.Services;
 using MoneyBee.Transfer.Service.Application.DomainEventHandlers;
 using MoneyBee.Transfer.Service.Domain.Events;
-using MoneyBee.Transfer.Service.Infrastructure.Caching;
 using MoneyBee.Transfer.Service.Infrastructure.Data;
 using MoneyBee.Transfer.Service.Infrastructure.ExternalServices;
 using MoneyBee.Transfer.Service.Infrastructure.Messaging;
@@ -70,9 +68,6 @@ builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<MoneyBee.Transfer.Service.Domain.Interfaces.ITransferRepository, MoneyBee.Transfer.Service.Infrastructure.Repositories.TransferRepository>();
 builder.Services.AddScoped<MoneyBee.Transfer.Service.Application.Interfaces.ITransferService, MoneyBee.Transfer.Service.Application.Services.TransferService>();
 
-// Caching
-builder.Services.AddScoped<ITransferCacheService, TransferCacheService>();
-
 // Metrics
 builder.Services.AddSingleton<TransferMetrics>();
 
@@ -118,9 +113,6 @@ builder.Services.AddScoped<MoneyBee.Transfer.Service.Domain.Services.TransferDom
 builder.Services.AddSingleton<IDistributedLockService, RedisDistributedLockService>();
 builder.Services.AddSingleton<MoneyBee.Transfer.Service.Infrastructure.Messaging.IEventPublisher, MoneyBee.Transfer.Service.Infrastructure.Messaging.RabbitMqEventPublisher>();
 
-// Unit of Work
-builder.Services.AddScoped<IUnitOfWork, UnitOfWork<TransferDbContext>>();
-
 // DDD - Domain Event Handlers
 builder.Services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 builder.Services.AddScoped<IDomainEventHandler<TransferCreatedDomainEvent>, TransferCreatedDomainEventHandler>();
@@ -129,7 +121,6 @@ builder.Services.AddScoped<IDomainEventHandler<TransferCancelledDomainEvent>, Tr
 
 // Background Services
 builder.Services.AddHostedService<CustomerEventConsumer>();
-builder.Services.AddHostedService<OutboxProcessor<TransferDbContext>>();
 
 // Health Checks
 builder.Services.AddHealthChecks()
