@@ -6,10 +6,13 @@ using MoneyBee.Auth.Service.Domain.Interfaces;
 using MoneyBee.Auth.Service.Infrastructure.Data;
 using MoneyBee.Auth.Service.Infrastructure.Caching;
 using MoneyBee.Auth.Service.Infrastructure.Repositories;
+using MoneyBee.Auth.Service.Infrastructure.Metrics;
 using MoneyBee.Auth.Service.Middleware;
 using MoneyBee.Auth.Service.Services;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using Serilog;
 using StackExchange.Redis;
 
@@ -78,6 +81,22 @@ builder.Services.AddScoped<IRateLimitService, RateLimitService>();
 // Redis Caching
 builder.Services.AddScoped<IApiKeyCacheService, ApiKeyCacheService>();
 
+// Metrics
+builder.Services.AddSingleton<AuthMetrics>();
+
+// OpenTelemetry Metrics
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource
+        .AddService(
+            serviceName: "MoneyBee.Auth.Service",
+            serviceVersion: "1.0.0",
+            serviceInstanceId: Environment.MachineName))
+    .WithMetrics(metrics => metrics
+        .AddMeter("MoneyBee.Auth.Service")
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddPrometheusExporter());
+
 // FluentValidation
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateApiKeyValidator>();
@@ -112,6 +131,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseSerilogRequestLogging();
+
+// OpenTelemetry Prometheus metrics endpoint (before authentication middleware)
+app.MapPrometheusScrapingEndpoint();
 
 // Custom Middleware
 app.UseMiddleware<ApiKeyAuthenticationMiddleware>();

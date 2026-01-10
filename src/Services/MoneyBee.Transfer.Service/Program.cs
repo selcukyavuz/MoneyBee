@@ -4,9 +4,13 @@ using MoneyBee.Common.Persistence;
 using MoneyBee.Common.Services;
 using MoneyBee.Transfer.Service.Application.DomainEventHandlers;
 using MoneyBee.Transfer.Service.Domain.Events;
+using MoneyBee.Transfer.Service.Infrastructure.Caching;
 using MoneyBee.Transfer.Service.Infrastructure.Data;
 using MoneyBee.Transfer.Service.Infrastructure.ExternalServices;
 using MoneyBee.Transfer.Service.Infrastructure.Messaging;
+using MoneyBee.Transfer.Service.Infrastructure.Metrics;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using Serilog;
 using StackExchange.Redis;
 
@@ -65,6 +69,25 @@ builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<MoneyBee.Transfer.Service.Domain.Interfaces.ITransferRepository, MoneyBee.Transfer.Service.Infrastructure.Repositories.TransferRepository>();
 builder.Services.AddScoped<MoneyBee.Transfer.Service.Application.Interfaces.ITransferService, MoneyBee.Transfer.Service.Application.Services.TransferService>();
 
+// Caching
+builder.Services.AddScoped<ITransferCacheService, TransferCacheService>();
+
+// Metrics
+builder.Services.AddSingleton<TransferMetrics>();
+
+// OpenTelemetry Metrics
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource
+        .AddService(
+            serviceName: "MoneyBee.Transfer.Service",
+            serviceVersion: "1.0.0",
+            serviceInstanceId: Environment.MachineName))
+    .WithMetrics(metrics => metrics
+        .AddMeter("MoneyBee.Transfer.Service")
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddPrometheusExporter());
+
 // DDD - Domain Services
 builder.Services.AddScoped<MoneyBee.Transfer.Service.Domain.Services.TransferDomainService>();
 
@@ -115,6 +138,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseSerilogRequestLogging();
+
+// OpenTelemetry Prometheus metrics endpoint
+app.MapPrometheusScrapingEndpoint();
 
 app.MapControllers();
 

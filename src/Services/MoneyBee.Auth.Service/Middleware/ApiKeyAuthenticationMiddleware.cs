@@ -18,11 +18,12 @@ public class ApiKeyAuthenticationMiddleware
 
     public async Task InvokeAsync(HttpContext context, IApiKeyService apiKeyService)
     {
-        // Skip authentication for health check and swagger endpoints
+        // Skip authentication for health check, metrics, and swagger endpoints
         var path = context.Request.Path.Value?.ToLower() ?? "";
-        if (path.Contains("/health") || 
-            path.Contains("/swagger") || 
-            path.Contains("/api/auth/keys") && context.Request.Method == "POST") // Allow creating first API key
+        if (path == "/health" || 
+            path == "/metrics" ||
+            path.StartsWith("/swagger") || 
+            (path == "/api/apikeys" && context.Request.Method == "POST")) // Allow creating first API key
         {
             await _next(context);
             return;

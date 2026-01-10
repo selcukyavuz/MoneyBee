@@ -6,11 +6,15 @@ using MoneyBee.Customer.Service.Application.DomainEventHandlers;
 using MoneyBee.Customer.Service.Application.Interfaces;
 using MoneyBee.Customer.Service.Domain.Events;
 using MoneyBee.Customer.Service.Domain.Interfaces;
+using MoneyBee.Customer.Service.Infrastructure.Caching;
 using MoneyBee.Customer.Service.Infrastructure.Data;
 using MoneyBee.Customer.Service.Infrastructure.ExternalServices;
 using MoneyBee.Customer.Service.Infrastructure.Messaging;
+using MoneyBee.Customer.Service.Infrastructure.Metrics;
 using MoneyBee.Customer.Service.Infrastructure.Repositories;
 using MoneyBee.Customer.Service.BackgroundServices;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using Serilog;
 using StackExchange.Redis;
 
@@ -64,6 +68,25 @@ builder.Services.AddHttpClient("KycService");
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<ICustomerService, MoneyBee.Customer.Service.Application.Services.CustomerService>();
 
+// Caching
+builder.Services.AddScoped<ICustomerCacheService, CustomerCacheService>();
+
+// Metrics
+builder.Services.AddSingleton<CustomerMetrics>();
+
+// OpenTelemetry Metrics
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource
+        .AddService(
+            serviceName: "MoneyBee.Customer.Service",
+            serviceVersion: "1.0.0",
+            serviceInstanceId: Environment.MachineName))
+    .WithMetrics(metrics => metrics
+        .AddMeter("MoneyBee.Customer.Service")
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddPrometheusExporter());
+
 // DDD - Domain Services
 builder.Services.AddScoped<MoneyBee.Customer.Service.Domain.Services.CustomerDomainService>();
 
@@ -115,6 +138,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseSerilogRequestLogging();
+
+// OpenTelemetry Prometheus metrics endpoint
+app.MapPrometheusScrapingEndpoint();
 
 app.MapControllers();
 

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using MoneyBee.Common.DDD;
 using MoneyBee.Common.Enums;
 using MoneyBee.Common.Events;
@@ -6,8 +7,10 @@ using MoneyBee.Customer.Service.Application.DTOs;
 using MoneyBee.Customer.Service.Application.Interfaces;
 using MoneyBee.Customer.Service.Domain.Interfaces;
 using MoneyBee.Customer.Service.Domain.Services;
+using MoneyBee.Customer.Service.Infrastructure.Caching;
 using MoneyBee.Customer.Service.Infrastructure.ExternalServices;
 using MoneyBee.Customer.Service.Infrastructure.Messaging;
+using MoneyBee.Customer.Service.Infrastructure.Metrics;
 using CustomerEntity = MoneyBee.Customer.Service.Domain.Entities.Customer;
 
 namespace MoneyBee.Customer.Service.Application.Services;
@@ -20,6 +23,8 @@ public class CustomerService : ICustomerService
     private readonly IDomainEventDispatcher _domainEventDispatcher;
     private readonly CustomerDomainService _domainService;
     private readonly ILogger<CustomerService> _logger;
+    private readonly ICustomerCacheService? _cacheService;
+    private readonly CustomerMetrics? _metrics;
 
     public CustomerService(
         ICustomerRepository repository,
@@ -27,7 +32,9 @@ public class CustomerService : ICustomerService
         IEventPublisher eventPublisher,
         IDomainEventDispatcher domainEventDispatcher,
         CustomerDomainService domainService,
-        ILogger<CustomerService> logger)
+        ILogger<CustomerService> logger,
+        ICustomerCacheService? cacheService = null,
+        CustomerMetrics? metrics = null)
     {
         _repository = repository;
         _kycService = kycService;
@@ -35,10 +42,14 @@ public class CustomerService : ICustomerService
         _domainEventDispatcher = domainEventDispatcher;
         _domainService = domainService;
         _logger = logger;
+        _cacheService = cacheService;
+        _metrics = metrics;
     }
 
     public async Task<CustomerDto> CreateCustomerAsync(CreateCustomerRequest request)
     {
+        var stopwatch = Stopwatch.StartNew();
+        
         // Validate National ID using Value Object
         var nationalId = NationalId.Create(request.NationalId);
 
@@ -65,11 +76,14 @@ public class CustomerService : ICustomerService
         _domainService.ValidateCustomerForCreation(customer);
 
         // Perform KYC verification (non-blocking)
+        var kycStopwatch = Stopwatch.StartNew();
         var kycResult = await _kycService.VerifyCustomerAsync(
             nationalId.Value,
             request.FirstName,
             request.LastName,
             request.DateOfBirth);
+        kycStopwatch.Stop();
+        _metrics?.RecordKycVerification(kycResult.IsVerified, kycStopwatch.Elapsed.TotalMilliseconds);
 
         if (kycResult.IsVerified)
         {
@@ -87,36 +101,96 @@ public class CustomerService : ICustomerService
         await _domainEventDispatcher.DispatchAsync(customer.DomainEvents);
         customer.ClearDomainEvents();
 
+        var dto = MapToDto(customer);
+        
+        // Cache the customer
+        if (_cacheService != null)
+        {
+            await _cacheService.SetCustomerAsync(customer.Id, dto);
+            await _cacheService.SetCustomerByNationalIdAsync(nationalId.Value, dto);
+        }
+
+        stopwatch.Stop();
+        _metrics?.RecordCustomerCreated();
+        _metrics?.RecordCustomerOperation("create", stopwatch.Elapsed.TotalMilliseconds);
+        
         var logMessage = kycResult.IsVerified 
             ? "Customer created with verified KYC" 
             : "Customer created with unverified KYC - verification will be retried";
         
         _logger.LogInformation("{LogMessage}: {CustomerId} - {NationalId}", logMessage, customer.Id, nationalId.Value);
 
-        return MapToDto(customer);
+        return dto;
     }
 
     public async Task<IEnumerable<CustomerDto>> GetAllCustomersAsync(int pageNumber = 1, int pageSize = 50)
     {
+        var stopwatch = Stopwatch.StartNew();
         var customers = await _repository.GetAllAsync(pageNumber, pageSize);
+        stopwatch.Stop();
+        _metrics?.RecordCustomerOperation("getAll", stopwatch.Elapsed.TotalMilliseconds);
         return customers.Select(MapToDto);
     }
 
     public async Task<CustomerDto?> GetCustomerByIdAsync(Guid id)
     {
+        // Check cache first
+        if (_cacheService != null)
+        {
+            var cached = await _cacheService.GetCustomerAsync(id);
+            if (cached != null)
+            {
+                return cached;
+            }
+        }
+        
+        var stopwatch = Stopwatch.StartNew();
         var customer = await _repository.GetByIdAsync(id);
+        stopwatch.Stop();
+        _metrics?.RecordCustomerOperation("getById", stopwatch.Elapsed.TotalMilliseconds);
+        
+        if (customer != null && _cacheService != null)
+        {
+            var dto = MapToDto(customer);
+            await _cacheService.SetCustomerAsync(id, dto);
+            return dto;
+        }
+        
         return customer != null ? MapToDto(customer) : null;
     }
 
     public async Task<CustomerDto?> GetCustomerByNationalIdAsync(string nationalId)
     {
         var nationalIdVO = NationalId.Create(nationalId);
+        
+        // Check cache first
+        if (_cacheService != null)
+        {
+            var cached = await _cacheService.GetCustomerByNationalIdAsync(nationalIdVO.Value);
+            if (cached != null)
+            {
+                return cached;
+            }
+        }
+        
+        var stopwatch = Stopwatch.StartNew();
         var customer = await _repository.GetByNationalIdAsync(nationalIdVO.Value);
+        stopwatch.Stop();
+        _metrics?.RecordCustomerOperation("getByNationalId", stopwatch.Elapsed.TotalMilliseconds);
+        
+        if (customer != null && _cacheService != null)
+        {
+            var dto = MapToDto(customer);
+            await _cacheService.SetCustomerByNationalIdAsync(nationalIdVO.Value, dto);
+            return dto;
+        }
+        
         return customer != null ? MapToDto(customer) : null;
     }
 
     public async Task<CustomerDto?> UpdateCustomerAsync(Guid id, UpdateCustomerRequest request)
     {
+        var stopwatch = Stopwatch.StartNew();
         var customer = await _repository.GetByIdAsync(id);
         if (customer == null)
             return null;
@@ -130,7 +204,17 @@ public class CustomerService : ICustomerService
             request.Email ?? customer.Email);
 
         await _repository.UpdateAsync(customer);
+        
+        // Invalidate cache
+        if (_cacheService != null)
+        {
+            await _cacheService.InvalidateCustomerAsync(id);
+            await _cacheService.InvalidateCustomerByNationalIdAsync(customer.NationalId);
+        }
 
+        stopwatch.Stop();
+        _metrics?.RecordCustomerUpdated();
+        _metrics?.RecordCustomerOperation("update", stopwatch.Elapsed.TotalMilliseconds);
         _logger.LogInformation("Customer updated: {CustomerId}", id);
 
         return MapToDto(customer);
@@ -138,6 +222,7 @@ public class CustomerService : ICustomerService
 
     public async Task<bool> UpdateCustomerStatusAsync(Guid id, UpdateCustomerStatusRequest request)
     {
+        var stopwatch = Stopwatch.StartNew();
         var customer = await _repository.GetByIdAsync(id);
         if (customer == null)
             return false;
@@ -149,9 +234,18 @@ public class CustomerService : ICustomerService
         customer.UpdateStatus(request.Status);
 
         await _repository.UpdateAsync(customer);
+        
+        // Invalidate cache
+        if (_cacheService != null)
+        {
+            await _cacheService.InvalidateCustomerAsync(id);
+            await _cacheService.InvalidateCustomerByNationalIdAsync(customer.NationalId);
+        }
 
-        _logger.LogInformation("Customer status updated: {CustomerId} from {OldStatus} to {NewStatus}. Reason: {Reason}",
-            id, customer.Status, request.Status, request.Reason);
+        stopwatch.Stop();
+        _metrics?.RecordCustomerOperation("updateStatus", stopwatch.Elapsed.TotalMilliseconds);
+        _logger.LogInformation("Customer status updated: {CustomerId} -> {NewStatus}. Reason: {Reason}", 
+            id, request.Status, request.Reason);
 
         // Dispatch domain events
         await _domainEventDispatcher.DispatchAsync(customer.DomainEvents);
@@ -162,6 +256,7 @@ public class CustomerService : ICustomerService
 
     public async Task<bool> DeleteCustomerAsync(Guid id)
     {
+        var stopwatch = Stopwatch.StartNew();
         var customer = await _repository.GetByIdAsync(id);
         if (customer == null)
             return false;
@@ -173,6 +268,16 @@ public class CustomerService : ICustomerService
 
         if (deleted)
         {
+            // Invalidate cache
+            if (_cacheService != null)
+            {
+                await _cacheService.InvalidateCustomerAsync(id);
+                await _cacheService.InvalidateCustomerByNationalIdAsync(customer.NationalId);
+            }
+            
+            stopwatch.Stop();
+            _metrics?.RecordCustomerDeleted();
+            _metrics?.RecordCustomerOperation("delete", stopwatch.Elapsed.TotalMilliseconds);
             _logger.LogWarning("Customer deleted: {CustomerId}", id);
 
             // Dispatch domain events
