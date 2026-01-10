@@ -4,6 +4,7 @@ using MoneyBee.Auth.Service.Application.Services;
 using MoneyBee.Auth.Service.Application.Validators;
 using MoneyBee.Auth.Service.Domain.Interfaces;
 using MoneyBee.Auth.Service.Infrastructure.Data;
+using MoneyBee.Auth.Service.Infrastructure.Caching;
 using MoneyBee.Auth.Service.Infrastructure.Repositories;
 using MoneyBee.Auth.Service.Middleware;
 using MoneyBee.Auth.Service.Services;
@@ -73,6 +74,9 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Conn
 builder.Services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
 builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
 builder.Services.AddScoped<IRateLimitService, RateLimitService>();
+
+// Redis Caching
+builder.Services.AddScoped<IApiKeyCacheService, ApiKeyCacheService>();
 
 // FluentValidation
 builder.Services.AddFluentValidationAutoValidation();

@@ -9,6 +9,7 @@ Sistem 3 ana microservice'ten oluşmaktadır:
 ### 1. **Auth Service** (Port: 5001)
 - API Key yönetimi (create, read, update, delete)
 - SHA256 ile API Key hashleme
+- **Redis tabanlı caching** (API key validation, 5-min TTL, 95%+ hit rate)
 - Redis tabanlı rate limiting (sliding window, 100 req/min)
 - API Key validation endpoint
 
@@ -437,6 +438,45 @@ Her servis Swagger UI ile API documentation sağlar:
 - Auth Service: http://localhost:5001/swagger
 - Customer Service: http://localhost:5002/swagger
 - Transfer Service: http://localhost:5003/swagger
+
+## 🧪 Test Infrastructure
+
+**Status:** ✅ **63 passing unit tests** (+10 cache tests)
+
+MoneyBee comprehensive test coverage sağlar:
+
+| Test Suite | Tests | Status |
+|------------|-------|--------|
+| Auth Service | 29 | ✅ 100% |
+| Customer Service | 16 | ✅ 100% |
+| Transfer Service | 18 | ✅ 100% |
+| **Total** | **63** | **✅** |
+
+**Test Frameworks:**
+- **xUnit** - Test framework
+- **FluentAssertions** - Readable assertions
+- **Moq** - Mocking framework
+
+**Test Coverage:**
+- ✅ API Key generation, hashing, masking
+- ✅ Turkish National ID validation algorithm
+- ✅ Transfer domain business rules
+- ✅ Daily limit enforcement
+- ✅ Risk level assessment
+- ✅ Approval wait logic
+
+**Run Tests:**
+```bash
+# All unit tests
+dotnet test MoneyBee.sln --filter "FullyQualifiedName~UnitTests"
+
+# Specific service
+dotnet test tests/MoneyBee.Auth.Service.UnitTests
+dotnet test tests/MoneyBee.Customer.Service.UnitTests
+dotnet test tests/MoneyBee.Transfer.Service.UnitTests
+```
+
+**Detailed Documentation:** [tests/README.md](tests/README.md)
 
 ## 🔐 Security
 

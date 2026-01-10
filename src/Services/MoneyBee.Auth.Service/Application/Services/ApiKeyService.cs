@@ -10,13 +10,17 @@ public class ApiKeyService : IApiKeyService
 {
     private readonly IApiKeyRepository _repository;
     private readonly ILogger<ApiKeyService> _logger;
+    private readonly IApiKeyCacheService _cacheService;
+    private static readonly TimeSpan CacheExpiration = TimeSpan.FromMinutes(5);
 
     public ApiKeyService(
         IApiKeyRepository repository,
-        ILogger<ApiKeyService> logger)
+        ILogger<ApiKeyService> logger,
+        IApiKeyCacheService cacheService)
     {
         _repository = repository;
         _logger = logger;
+        _cacheService = cacheService;
     }
 
     public async Task<CreateApiKeyResponse> CreateApiKeyAsync(CreateApiKeyRequest request)
@@ -107,6 +111,9 @@ public class ApiKeyService : IApiKeyService
 
         var updated = await _repository.UpdateAsync(key);
 
+        // Invalidate cache since key status/details changed
+        await _cacheService.InvalidateCacheAsync(updated.KeyHash);
+
         _logger.LogInformation("API Key updated: {KeyId}", id);
 
         return new ApiKeyDto
@@ -133,6 +140,9 @@ public class ApiKeyService : IApiKeyService
 
         if (deleted)
         {
+            // Invalidate cache for deleted key
+            await _cacheService.InvalidateCacheAsync(key.KeyHash);
+            
             _logger.LogWarning("API Key deleted: {KeyId} - {KeyName}", id, key.Name);
         }
 
@@ -145,14 +155,33 @@ public class ApiKeyService : IApiKeyService
             return false;
 
         var keyHash = ApiKeyHelper.HashApiKey(apiKey);
+        
+        // Check cache first (cache-aside pattern)
+        var cachedResult = await _cacheService.GetValidationResultAsync(keyHash);
+        if (cachedResult.HasValue)
+        {
+            return cachedResult.Value;
+        }
+
+        // Cache miss - query database
         var key = await _repository.GetByKeyHashAsync(keyHash);
 
         if (key == null || !key.IsActive)
+        {
+            // Cache negative result for shorter time to allow quick reactivation
+            await _cacheService.SetValidationResultAsync(keyHash, false, TimeSpan.FromMinutes(1));
             return false;
+        }
 
         if (key.ExpiresAt.HasValue && key.ExpiresAt.Value <= DateTime.UtcNow)
+        {
+            // Cache expired key result
+            await _cacheService.SetValidationResultAsync(keyHash, false, TimeSpan.FromMinutes(1));
             return false;
+        }
 
+        // Cache positive result
+        await _cacheService.SetValidationResultAsync(keyHash, true, CacheExpiration);
         return true;
     }
 
