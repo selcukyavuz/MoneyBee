@@ -1,6 +1,10 @@
 using Microsoft.EntityFrameworkCore;
-using MoneyBee.Customer.Service.Data;
-using MoneyBee.Customer.Service.Services;
+using MoneyBee.Customer.Service.Application.Interfaces;
+using MoneyBee.Customer.Service.Domain.Interfaces;
+using MoneyBee.Customer.Service.Infrastructure.Data;
+using MoneyBee.Customer.Service.Infrastructure.ExternalServices;
+using MoneyBee.Customer.Service.Infrastructure.Messaging;
+using MoneyBee.Customer.Service.Infrastructure.Repositories;
 using MoneyBee.Customer.Service.BackgroundServices;
 using Serilog;
 using StackExchange.Redis;
@@ -51,7 +55,11 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Conn
 // HTTP Clients
 builder.Services.AddHttpClient("KycService");
 
-// Services
+// Clean Architecture - Dependency Injection
+builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+builder.Services.AddScoped<ICustomerService, MoneyBee.Customer.Service.Application.Services.CustomerService>();
+
+// Infrastructure Services
 builder.Services.AddScoped<IKycService, KycService>();
 builder.Services.AddSingleton<IEventPublisher, RabbitMqEventPublisher>();
 

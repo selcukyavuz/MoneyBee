@@ -1,7 +1,14 @@
 using Microsoft.EntityFrameworkCore;
-using MoneyBee.Auth.Service.Data;
+using MoneyBee.Auth.Service.Application.Interfaces;
+using MoneyBee.Auth.Service.Application.Services;
+using MoneyBee.Auth.Service.Application.Validators;
+using MoneyBee.Auth.Service.Domain.Interfaces;
+using MoneyBee.Auth.Service.Infrastructure.Data;
+using MoneyBee.Auth.Service.Infrastructure.Repositories;
 using MoneyBee.Auth.Service.Middleware;
 using MoneyBee.Auth.Service.Services;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Serilog;
 using StackExchange.Redis;
 
@@ -62,8 +69,14 @@ builder.Services.AddDbContext<AuthDbContext>(options =>
 var redisConnectionString = builder.Configuration["Redis:ConnectionString"];
 builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnectionString!));
 
-// Services
+// Clean Architecture - Dependency Injection
+builder.Services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
+builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
 builder.Services.AddScoped<IRateLimitService, RateLimitService>();
+
+// FluentValidation
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<CreateApiKeyValidator>();
 
 // Health Checks
 builder.Services.AddHealthChecks()

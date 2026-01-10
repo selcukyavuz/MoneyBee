@@ -1,6 +1,5 @@
-using MoneyBee.Auth.Service.Data;
+using MoneyBee.Auth.Service.Application.Interfaces;
 using MoneyBee.Auth.Service.Helpers;
-using Microsoft.EntityFrameworkCore;
 
 namespace MoneyBee.Auth.Service.Middleware;
 
@@ -17,7 +16,7 @@ public class ApiKeyAuthenticationMiddleware
         _logger = logger;
     }
 
-    public async Task InvokeAsync(HttpContext context, AuthDbContext dbContext)
+    public async Task InvokeAsync(HttpContext context, IApiKeyService apiKeyService)
     {
         // Skip authentication for health check and swagger endpoints
         var path = context.Request.Path.Value?.ToLower() ?? "";
@@ -48,34 +47,14 @@ public class ApiKeyAuthenticationMiddleware
             return;
         }
 
-        // Hash and validate against database
-        var keyHash = ApiKeyHelper.HashApiKey(apiKey);
-        var apiKeyEntity = await dbContext.ApiKeys
-            .FirstOrDefaultAsync(k => k.KeyHash == keyHash);
+        // Validate API Key using service
+        var isValid = await apiKeyService.ValidateApiKeyAsync(apiKey);
 
-        if (apiKeyEntity == null)
+        if (!isValid)
         {
             _logger.LogWarning("Invalid API Key attempt from {IpAddress}", context.Connection.RemoteIpAddress);
             context.Response.StatusCode = 401;
-            await context.Response.WriteAsJsonAsync(new { error = "Invalid API Key" });
-            return;
-        }
-
-        // Check if key is active
-        if (!apiKeyEntity.IsActive)
-        {
-            _logger.LogWarning("Inactive API Key used: {KeyId}", apiKeyEntity.Id);
-            context.Response.StatusCode = 401;
-            await context.Response.WriteAsJsonAsync(new { error = "API Key is inactive" });
-            return;
-        }
-
-        // Check if key is expired
-        if (apiKeyEntity.ExpiresAt.HasValue && apiKeyEntity.ExpiresAt.Value < DateTime.UtcNow)
-        {
-            _logger.LogWarning("Expired API Key used: {KeyId}", apiKeyEntity.Id);
-            context.Response.StatusCode = 401;
-            await context.Response.WriteAsJsonAsync(new { error = "API Key has expired" });
+            await context.Response.WriteAsJsonAsync(new { error = "Invalid or expired API Key" });
             return;
         }
 
@@ -84,18 +63,13 @@ public class ApiKeyAuthenticationMiddleware
         {
             try
             {
-                apiKeyEntity.LastUsedAt = DateTime.UtcNow;
-                await dbContext.SaveChangesAsync();
+                await apiKeyService.UpdateLastUsedAsync(apiKey);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to update LastUsedAt for API Key {KeyId}", apiKeyEntity.Id);
+                _logger.LogError(ex, "Failed to update LastUsedAt for API Key");
             }
         });
-
-        // Add API Key ID to context for logging/tracking
-        context.Items["ApiKeyId"] = apiKeyEntity.Id;
-        context.Items["ApiKeyName"] = apiKeyEntity.Name;
 
         await _next(context);
     }

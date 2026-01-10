@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using MoneyBee.Customer.Service.Data;
-using MoneyBee.Customer.Service.Services;
+using MoneyBee.Customer.Service.Domain.Interfaces;
+using MoneyBee.Customer.Service.Infrastructure.ExternalServices;
 
 namespace MoneyBee.Customer.Service.BackgroundServices;
 
@@ -40,21 +40,19 @@ public class KycRetryService : BackgroundService
     private async Task RetryUnverifiedCustomersAsync(CancellationToken cancellationToken)
     {
         using var scope = _serviceProvider.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<CustomerDbContext>();
+        var repository = scope.ServiceProvider.GetRequiredService<ICustomerRepository>();
         var kycService = scope.ServiceProvider.GetRequiredService<IKycService>();
 
         // Get unverified customers (created in last 24 hours)
-        var unverifiedCustomers = await context.Customers
-            .Where(c => !c.KycVerified && c.CreatedAt > DateTime.UtcNow.AddHours(-24))
-            .ToListAsync(cancellationToken);
+        var unverifiedCustomers = await repository.GetUnverifiedKycCustomersAsync(24);
 
         if (!unverifiedCustomers.Any())
         {
-            _logger.LogInformation("No unverified customers to retry KYC");
+            _logger.LogDebug("No unverified customers to retry KYC");
             return;
         }
 
-        _logger.LogInformation("Retrying KYC for {Count} customers", unverifiedCustomers.Count);
+        _logger.LogInformation("Retrying KYC for {Count} customers", unverifiedCustomers.Count());
 
         foreach (var customer in unverifiedCustomers)
         {
@@ -69,7 +67,7 @@ public class KycRetryService : BackgroundService
                 if (result.IsVerified)
                 {
                     customer.KycVerified = true;
-                    customer.UpdatedAt = DateTime.UtcNow;
+                    await repository.UpdateAsync(customer);
                     
                     _logger.LogInformation("KYC verification successful for customer {CustomerId}", customer.Id);
                 }
@@ -84,8 +82,6 @@ public class KycRetryService : BackgroundService
                 _logger.LogError(ex, "Error retrying KYC for customer {CustomerId}", customer.Id);
             }
         }
-
-        await context.SaveChangesAsync(cancellationToken);
     }
 
     public override Task StopAsync(CancellationToken cancellationToken)

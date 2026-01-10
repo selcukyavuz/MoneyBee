@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using MoneyBee.Transfer.Service.Data;
-using MoneyBee.Transfer.Service.Services;
+using MoneyBee.Transfer.Service.Infrastructure.Data;
+using MoneyBee.Transfer.Service.Infrastructure.ExternalServices;
+using MoneyBee.Transfer.Service.Infrastructure.Messaging;
 using Serilog;
 using StackExchange.Redis;
 
@@ -56,6 +57,8 @@ builder.Services.AddHttpClient("CustomerService");
 builder.Services.AddScoped<IFraudDetectionService, FraudDetectionService>();
 builder.Services.AddScoped<IExchangeRateService, ExchangeRateService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
+builder.Services.AddScoped<MoneyBee.Transfer.Service.Domain.Interfaces.ITransferRepository, MoneyBee.Transfer.Service.Infrastructure.Repositories.TransferRepository>();
+builder.Services.AddScoped<MoneyBee.Transfer.Service.Application.Interfaces.ITransferService, MoneyBee.Transfer.Service.Application.Services.TransferService>();
 
 // Background Services
 builder.Services.AddHostedService<CustomerEventConsumer>();
