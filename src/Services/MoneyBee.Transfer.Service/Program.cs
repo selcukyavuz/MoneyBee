@@ -70,6 +70,7 @@ builder.Services.AddScoped<MoneyBee.Transfer.Service.Domain.Services.TransferDom
 
 // Infrastructure Services
 builder.Services.AddSingleton<IDistributedLockService, RedisDistributedLockService>();
+builder.Services.AddSingleton<MoneyBee.Transfer.Service.Infrastructure.Messaging.IEventPublisher, MoneyBee.Transfer.Service.Infrastructure.Messaging.RabbitMqEventPublisher>();
 
 // Unit of Work
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork<TransferDbContext>>();

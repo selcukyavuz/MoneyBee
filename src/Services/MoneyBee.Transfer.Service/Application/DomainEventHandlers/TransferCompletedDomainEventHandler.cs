@@ -1,17 +1,23 @@
 using MoneyBee.Common.DDD;
+using MoneyBee.Common.Events;
 using MoneyBee.Transfer.Service.Domain.Events;
+using MoneyBee.Transfer.Service.Infrastructure.Messaging;
 
 namespace MoneyBee.Transfer.Service.Application.DomainEventHandlers;
 
 /// <summary>
-/// Handles TransferCompletedDomainEvent - notifications, analytics, rewards
+/// Handles TransferCompletedDomainEvent - notifications, finalization
 /// </summary>
 public class TransferCompletedDomainEventHandler : IDomainEventHandler<TransferCompletedDomainEvent>
 {
+    private readonly IEventPublisher _eventPublisher;
     private readonly ILogger<TransferCompletedDomainEventHandler> _logger;
 
-    public TransferCompletedDomainEventHandler(ILogger<TransferCompletedDomainEventHandler> logger)
+    public TransferCompletedDomainEventHandler(
+        IEventPublisher eventPublisher,
+        ILogger<TransferCompletedDomainEventHandler> logger)
     {
+        _eventPublisher = eventPublisher;
         _logger = logger;
     }
 
@@ -34,8 +40,18 @@ public class TransferCompletedDomainEventHandler : IDomainEventHandler<TransferC
         // 4. Analytics - track completion time
         await TrackCompletionMetricsAsync(domainEvent);
 
+        // 5. Publish integration event to RabbitMQ
+        var integrationEvent = new TransferCompletedEvent
+        {
+            TransferId = domainEvent.TransferId,
+            TransactionCode = domainEvent.TransactionCode,
+            CorrelationId = domainEvent.EventId.ToString()
+        };
+
+        await _eventPublisher.PublishAsync(integrationEvent);
+
         _logger.LogInformation(
-            "Transfer completion handled: {TransactionCode}",
+            "Transfer completion handled and published to message bus: {TransactionCode}",
             domainEvent.TransactionCode);
     }
 

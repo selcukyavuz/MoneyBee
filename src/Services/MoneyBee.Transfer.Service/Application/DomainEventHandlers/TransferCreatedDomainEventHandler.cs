@@ -1,5 +1,7 @@
 using MoneyBee.Common.DDD;
+using MoneyBee.Common.Events;
 using MoneyBee.Transfer.Service.Domain.Events;
+using MoneyBee.Transfer.Service.Infrastructure.Messaging;
 
 namespace MoneyBee.Transfer.Service.Application.DomainEventHandlers;
 
@@ -8,10 +10,14 @@ namespace MoneyBee.Transfer.Service.Application.DomainEventHandlers;
 /// </summary>
 public class TransferCreatedDomainEventHandler : IDomainEventHandler<TransferCreatedDomainEvent>
 {
+    private readonly IEventPublisher _eventPublisher;
     private readonly ILogger<TransferCreatedDomainEventHandler> _logger;
 
-    public TransferCreatedDomainEventHandler(ILogger<TransferCreatedDomainEventHandler> logger)
+    public TransferCreatedDomainEventHandler(
+        IEventPublisher eventPublisher,
+        ILogger<TransferCreatedDomainEventHandler> logger)
     {
+        _eventPublisher = eventPublisher;
         _logger = logger;
     }
 
@@ -35,8 +41,21 @@ public class TransferCreatedDomainEventHandler : IDomainEventHandler<TransferCre
         // 3. Update analytics/metrics
         await UpdateMetricsAsync(domainEvent);
 
+        // 4. Publish integration event to RabbitMQ for other services
+        var integrationEvent = new TransferCreatedEvent
+        {
+            TransferId = domainEvent.TransferId,
+            SenderId = domainEvent.SenderId,
+            ReceiverId = domainEvent.ReceiverId,
+            Amount = domainEvent.Amount,
+            Currency = domainEvent.Currency.ToString(),
+            CorrelationId = domainEvent.EventId.ToString()
+        };
+
+        await _eventPublisher.PublishAsync(integrationEvent);
+
         _logger.LogInformation(
-            "Transfer creation handled: {TransactionCode}",
+            "Transfer creation handled and published to message bus: {TransactionCode}",
             domainEvent.TransactionCode);
     }
 

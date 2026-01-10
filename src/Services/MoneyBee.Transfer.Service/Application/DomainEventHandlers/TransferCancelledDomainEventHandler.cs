@@ -1,17 +1,23 @@
 using MoneyBee.Common.DDD;
+using MoneyBee.Common.Events;
 using MoneyBee.Transfer.Service.Domain.Events;
+using MoneyBee.Transfer.Service.Infrastructure.Messaging;
 
 namespace MoneyBee.Transfer.Service.Application.DomainEventHandlers;
 
 /// <summary>
-/// Handles TransferCancelledDomainEvent - refunds, notifications
+/// Handles TransferCancelledDomainEvent - notifications, cleanup
 /// </summary>
 public class TransferCancelledDomainEventHandler : IDomainEventHandler<TransferCancelledDomainEvent>
 {
+    private readonly IEventPublisher _eventPublisher;
     private readonly ILogger<TransferCancelledDomainEventHandler> _logger;
 
-    public TransferCancelledDomainEventHandler(ILogger<TransferCancelledDomainEventHandler> logger)
+    public TransferCancelledDomainEventHandler(
+        IEventPublisher eventPublisher,
+        ILogger<TransferCancelledDomainEventHandler> logger)
     {
+        _eventPublisher = eventPublisher;
         _logger = logger;
     }
 
@@ -34,8 +40,18 @@ public class TransferCancelledDomainEventHandler : IDomainEventHandler<TransferC
         // 4. Update cancellation metrics
         await TrackCancellationMetricsAsync(domainEvent);
 
+        // 5. Publish integration event to RabbitMQ
+        var integrationEvent = new TransferCancelledEvent
+        {
+            TransferId = domainEvent.TransferId,
+            Reason = domainEvent.Reason,
+            CorrelationId = domainEvent.EventId.ToString()
+        };
+
+        await _eventPublisher.PublishAsync(integrationEvent);
+
         _logger.LogInformation(
-            "Transfer cancellation handled: {TransactionCode}",
+            "Transfer cancellation handled and published to message bus: {TransactionCode}",
             domainEvent.TransactionCode);
     }
 
