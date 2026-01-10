@@ -173,3 +173,9 @@ app.MapHealthChecks("/health");
 Log.Information("MoneyBee Customer Service starting...");
 
 app.Run();
+
+// Make Program accessible to integration tests
+namespace MoneyBee.Customer.Service
+{
+    public partial class Program { }
+}

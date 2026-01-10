@@ -1,10 +1,4 @@
-﻿namespace MoneyBee.IntegrationTests;
-
-public class UnitTest1
-{
-    [Fact]
-    public void Test1()
-    {
-
-    }
-}
+﻿// This file has been replaced by comprehensive E2E integration tests
+// See:
+// - E2E/CompleteTransferFlowTests.cs
+// - E2E/CustomerServiceTests.cs
