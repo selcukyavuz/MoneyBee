@@ -47,7 +47,7 @@ Sistem 3 ana microservice'ten oluşmaktadır:
 
 - Docker ve Docker Compose
 - .NET 8.0 SDK (local development için)
-- Postman (API testing için)
+- Postman (API testing için - collection provided)
 
 ## 🚀 Kurulum ve Çalıştırma
 
@@ -88,6 +88,24 @@ docker-compose ps
 - Auth Service: http://localhost:5001/swagger
 - Customer Service: http://localhost:5002/swagger
 - Transfer Service: http://localhost:5003/swagger
+
+### 6. Postman Collection
+
+Proje root dizininde `MoneyBee.postman_collection.json` dosyasını Postman'e import edin:
+
+1. Postman'i açın
+2. Import → File → `MoneyBee.postman_collection.json` seçin
+3. Collection içerisinde tüm endpoint'ler ve test senaryoları hazır
+4. İlk olarak **"Auth Service → Create API Key"** isteğini çalıştırın
+5. API Key otomatik olarak environment variable'a kaydedilir
+6. Diğer istekleri sırayla çalıştırabilirsiniz
+
+Collection'da hazır senaryolar:
+- ✅ Complete Transfer Flow (API Key → Customer → Transfer)
+- ✅ Rate Limiting Test
+- ✅ Daily Limit Test
+- ✅ High-Value Transfer Test (>1000 TRY)
+- ✅ Multi-Currency Transfer (USD, EUR)
 
 ## 📚 API Kullanımı
 

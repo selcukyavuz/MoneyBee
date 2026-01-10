@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "MoneyBee API Collection",
-    "description": "MoneyBee Money Transfer System API endpoints",
+    "description": "Complete API collection for MoneyBee Money Transfer System\n\n## Quick Start Guide\n1. Run `docker-compose up -d` to start all services\n2. Execute \"Auth Service → Create API Key\" to get your API key\n3. API key will be automatically saved to collection variable\n4. Run \"End-to-End Scenarios → Scenario 1: Happy Path\" to test complete flow\n\n## Features\n- ✅ All 3 microservices (Auth, Customer, Transfer)\n- ✅ Ready-to-use test scenarios\n- ✅ Auto-save API keys and IDs\n- ✅ Valid TC Kimlik No examples (10000000146, 11111111110)\n- ✅ Multi-currency transfers (TRY, USD, EUR, GBP)\n- ✅ Business rules testing (daily limit, high-value wait, fraud detection)\n\n## Important Notes\n- TC Kimlik No must pass checksum validation\n- Valid examples: 10000000146, 11111111110, 12345678958\n- High-value transfers (>1000 TRY) require 5-minute approval wait\n- Daily limit per customer: 10,000 TRY\n- Rate limit: 100 requests per minute per API key",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -27,12 +27,12 @@
     },
     {
       "key": "sender_nationalId",
-      "value": "12345678901",
+      "value": "10000000146",
       "type": "string"
     },
     {
       "key": "receiver_nationalId",
-      "value": "98765432109",
+      "value": "11111111110",
       "type": "string"
     },
     {
@@ -113,6 +113,69 @@
               "raw": "{{baseUrl_auth}}/api/auth/keys",
               "host": ["{{baseUrl_auth}}"],
               "path": ["api", "auth", "keys"]
+            }
+          }
+        },
+        {
+          "name": "Get API Key by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl_auth}}/api/auth/keys/{{apiKeyId}}",
+              "host": ["{{baseUrl_auth}}"],
+              "path": ["api", "auth", "keys", "{{apiKeyId}}"],
+              "variable": [
+                {
+                  "key": "apiKeyId",
+                  "value": "your-key-id-here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update API Key",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Application Name\",\n  \"description\": \"Updated description\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl_auth}}/api/auth/keys/{{apiKeyId}}",
+              "host": ["{{baseUrl_auth}}"],
+              "path": ["api", "auth", "keys", "{{apiKeyId}}"],
+              "variable": [
+                {
+                  "key": "apiKeyId",
+                  "value": "your-key-id-here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Deactivate API Key",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl_auth}}/api/auth/keys/{{apiKeyId}}",
+              "host": ["{{baseUrl_auth}}"],
+              "path": ["api", "auth", "keys", "{{apiKeyId}}"],
+              "variable": [
+                {
+                  "key": "apiKeyId",
+                  "value": "your-key-id-here"
+                }
+              ]
             }
           }
         },
@@ -264,6 +327,73 @@
           }
         },
         {
+          "name": "Get Customer by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl_customer}}/api/customers/{{sender_id}}",
+              "host": ["{{baseUrl_customer}}"],
+              "path": ["api", "customers", "{{sender_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Customer",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ahmet Updated\",\n  \"lastName\": \"Yılmaz Updated\",\n  \"email\": \"ahmet.updated@example.com\",\n  \"phoneNumber\": \"+905551234999\",\n  \"address\": \"Updated Address, Istanbul\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl_customer}}/api/customers/{{sender_id}}",
+              "host": ["{{baseUrl_customer}}"],
+              "path": ["api", "customers", "{{sender_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Corporate Customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nationalId\": \"1234567890\",\n  \"firstName\": \"Acme\",\n  \"lastName\": \"Corporation\",\n  \"email\": \"info@acme.com\",\n  \"phoneNumber\": \"+905551111111\",\n  \"dateOfBirth\": \"2010-01-01\",\n  \"customerType\": \"Corporate\",\n  \"taxNumber\": \"1234567890\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl_customer}}/api/customers",
+              "host": ["{{baseUrl_customer}}"],
+              "path": ["api", "customers"]
+            }
+          }
+        },
+        {
           "name": "Verify Customer by National ID",
           "request": {
             "method": "GET",
@@ -303,6 +433,32 @@
               "host": ["{{baseUrl_customer}}"],
               "path": ["api", "customers", "{{sender_id}}", "status"]
             }
+          }
+        },
+        {
+          "name": "Block Customer",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newStatus\": \"Blocked\",\n  \"reason\": \"Fraud detected - testing auto-cancel pending transfers\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl_customer}}/api/customers/{{sender_id}}/status",
+              "host": ["{{baseUrl_customer}}"],
+              "path": ["api", "customers", "{{sender_id}}", "status"]
+            },
+            "description": "When a customer is blocked, all pending transfers are automatically cancelled"
           }
         }
       ]
@@ -426,6 +582,66 @@
           }
         },
         {
+          "name": "Create Transfer (EUR)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senderNationalId\": \"{{sender_nationalId}}\",\n  \"receiverNationalId\": \"{{receiver_nationalId}}\",\n  \"amount\": 150,\n  \"currency\": \"EUR\",\n  \"description\": \"Test transfer - EUR currency with exchange rate\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl_transfer}}/api/transfers",
+              "host": ["{{baseUrl_transfer}}"],
+              "path": ["api", "transfers"]
+            },
+            "description": "EUR to TRY conversion using Exchange Rate Service"
+          }
+        },
+        {
+          "name": "Create Transfer (GBP)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senderNationalId\": \"{{sender_nationalId}}\",\n  \"receiverNationalId\": \"{{receiver_nationalId}}\",\n  \"amount\": 200,\n  \"currency\": \"GBP\",\n  \"description\": \"Test transfer - GBP currency with exchange rate\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl_transfer}}/api/transfers",
+              "host": ["{{baseUrl_transfer}}"],
+              "path": ["api", "transfers"]
+            },
+            "description": "GBP to TRY conversion using Exchange Rate Service"
+          }
+        },
+        {
           "name": "Get Transfer by Code",
           "request": {
             "method": "GET",
@@ -440,6 +656,39 @@
               "host": ["{{baseUrl_transfer}}"],
               "path": ["api", "transfers", "{{transactionCode}}"]
             }
+          }
+        },
+        {
+          "name": "Get All Transfers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl_transfer}}/api/transfers?pageNumber=1&pageSize=20",
+              "host": ["{{baseUrl_transfer}}"],
+              "path": ["api", "transfers"],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "PENDING",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Get all transfers with optional status filter (PENDING, COMPLETED, CANCELLED, FAILED)"
           }
         },
         {
@@ -535,6 +784,24 @@
               "path": ["api", "transfers", "limit", "{{sender_id}}"]
             }
           }
+        },
+        {
+          "name": "Get Customer Daily Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl_transfer}}/api/transfers/customer/{{sender_nationalId}}/daily",
+              "host": ["{{baseUrl_transfer}}"],
+              "path": ["api", "transfers", "customer", "{{sender_nationalId}}", "daily"]
+            },
+            "description": "Get daily transfer summary: total amount, transfer count, remaining limit"
+          }
         }
       ]
     },
@@ -542,7 +809,7 @@
       "name": "End-to-End Scenarios",
       "item": [
         {
-          "name": "Scenario 1: Happy Path",
+          "name": "Scenario 1: Complete Transfer Flow (Happy Path)",
           "item": [
             {
               "name": "1. Create API Key",
@@ -670,8 +937,708 @@
               }
             }
           ]
+        },
+        {
+          "name": "Scenario 2: Transfer Cancellation Flow",
+          "item": [
+            {
+              "name": "1. Create Transfer to Cancel",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200 || pm.response.code === 201) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.transactionCode) {",
+                      "        pm.collectionVariables.set('transactionCode', jsonData.data.transactionCode);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  },
+                  {
+                    "key": "X-Idempotency-Key",
+                    "value": "{{$guid}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"senderNationalId\": \"{{sender_nationalId}}\",\n  \"receiverNationalId\": \"{{receiver_nationalId}}\",\n  \"amount\": 750,\n  \"currency\": \"TRY\",\n  \"description\": \"Transfer to be cancelled - testing fee refund\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers"]
+                }
+              }
+            },
+            {
+              "name": "2. Get Transfer Details",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers", "{{transactionCode}}"]
+                }
+              }
+            },
+            {
+              "name": "3. Cancel Transfer",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nationalId\": \"{{sender_nationalId}}\",\n  \"reason\": \"Customer changed their mind - testing fee refund\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}/cancel",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers", "{{transactionCode}}", "cancel"]
+                },
+                "description": "Fee should be automatically refunded"
+              }
+            },
+            {
+              "name": "4. Verify Cancellation",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers", "{{transactionCode}}"]
+                },
+                "description": "Status should be CANCELLED"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Scenario 3: Foreign Exchange Transfer",
+          "item": [
+            {
+              "name": "1. Create USD Transfer",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200 || pm.response.code === 201) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.transactionCode) {",
+                      "        pm.collectionVariables.set('transactionCode', jsonData.data.transactionCode);",
+                      "        console.log('Exchange Rate:', jsonData.data.exchangeRate);",
+                      "        console.log('Amount in TRY:', jsonData.data.amountInTRY);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  },
+                  {
+                    "key": "X-Idempotency-Key",
+                    "value": "{{$guid}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"senderNationalId\": \"{{sender_nationalId}}\",\n  \"receiverNationalId\": \"{{receiver_nationalId}}\",\n  \"amount\": 100,\n  \"currency\": \"USD\",\n  \"description\": \"USD to TRY conversion test\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers"]
+                },
+                "description": "Exchange Rate Service will be called automatically"
+              }
+            },
+            {
+              "name": "2. Create EUR Transfer",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  },
+                  {
+                    "key": "X-Idempotency-Key",
+                    "value": "{{$guid}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"senderNationalId\": \"{{sender_nationalId}}\",\n  \"receiverNationalId\": \"{{receiver_nationalId}}\",\n  \"amount\": 80,\n  \"currency\": \"EUR\",\n  \"description\": \"EUR to TRY conversion test\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers"]
+                }
+              }
+            },
+            {
+              "name": "3. Create GBP Transfer",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  },
+                  {
+                    "key": "X-Idempotency-Key",
+                    "value": "{{$guid}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"senderNationalId\": \"{{sender_nationalId}}\",\n  \"receiverNationalId\": \"{{receiver_nationalId}}\",\n  \"amount\": 60,\n  \"currency\": \"GBP\",\n  \"description\": \"GBP to TRY conversion test\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Scenario 4: Daily Limit Test",
+          "item": [
+            {
+              "name": "1. Check Initial Daily Limit",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers/customer/{{sender_nationalId}}/daily",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers", "customer", "{{sender_nationalId}}", "daily"]
+                },
+                "description": "Should show 10,000 TRY available"
+              }
+            },
+            {
+              "name": "2. Create Large Transfer (3000 TRY)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  },
+                  {
+                    "key": "X-Idempotency-Key",
+                    "value": "{{$guid}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"senderNationalId\": \"{{sender_nationalId}}\",\n  \"receiverNationalId\": \"{{receiver_nationalId}}\",\n  \"amount\": 3000,\n  \"currency\": \"TRY\",\n  \"description\": \"Testing daily limit - transfer 1\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers"]
+                }
+              }
+            },
+            {
+              "name": "3. Create Another Transfer (3500 TRY)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  },
+                  {
+                    "key": "X-Idempotency-Key",
+                    "value": "{{$guid}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"senderNationalId\": \"{{sender_nationalId}}\",\n  \"receiverNationalId\": \"{{receiver_nationalId}}\",\n  \"amount\": 3500,\n  \"currency\": \"TRY\",\n  \"description\": \"Testing daily limit - transfer 2\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers"]
+                }
+              }
+            },
+            {
+              "name": "4. Create Third Transfer (4000 TRY)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  },
+                  {
+                    "key": "X-Idempotency-Key",
+                    "value": "{{$guid}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"senderNationalId\": \"{{sender_nationalId}}\",\n  \"receiverNationalId\": \"{{receiver_nationalId}}\",\n  \"amount\": 4000,\n  \"currency\": \"TRY\",\n  \"description\": \"Testing daily limit - transfer 3 (should fail - exceeds 10K limit)\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers"]
+                },
+                "description": "This should FAIL - total would be 10,500 TRY (exceeds 10,000 limit)"
+              }
+            },
+            {
+              "name": "5. Check Remaining Limit",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers/customer/{{sender_nationalId}}/daily",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers", "customer", "{{sender_nationalId}}", "daily"]
+                },
+                "description": "Should show used: 6500 TRY, remaining: 3500 TRY"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Scenario 5: High-Value Transfer (>1000 TRY)",
+          "item": [
+            {
+              "name": "1. Create High-Value Transfer",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200 || pm.response.code === 201) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.transactionCode) {",
+                      "        pm.collectionVariables.set('transactionCode', jsonData.data.transactionCode);",
+                      "        console.log('High-value transfer created - must wait 5 minutes');",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  },
+                  {
+                    "key": "X-Idempotency-Key",
+                    "value": "{{$guid}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"senderNationalId\": \"{{sender_nationalId}}\",\n  \"receiverNationalId\": \"{{receiver_nationalId}}\",\n  \"amount\": 2500,\n  \"currency\": \"TRY\",\n  \"description\": \"High-value transfer - requires 5 min approval wait\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers"]
+                },
+                "description": "Amount > 1000 TRY requires 5-minute wait before completion"
+              }
+            },
+            {
+              "name": "2. Try to Complete Immediately (Should Fail)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nationalId\": \"{{sender_nationalId}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}/complete",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers", "{{transactionCode}}", "complete"]
+                },
+                "description": "Should FAIL - 5 minutes haven't passed yet"
+              }
+            },
+            {
+              "name": "3. Complete After 5 Minutes",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nationalId\": \"{{sender_nationalId}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}/complete",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers", "{{transactionCode}}", "complete"]
+                },
+                "description": "Wait 5 minutes then run this - should succeed"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Scenario 6: Customer Blocking Auto-Cancel",
+          "item": [
+            {
+              "name": "1. Create Transfer",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200 || pm.response.code === 201) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.transactionCode) {",
+                      "        pm.collectionVariables.set('transactionCode', jsonData.data.transactionCode);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  },
+                  {
+                    "key": "X-Idempotency-Key",
+                    "value": "{{$guid}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"senderNationalId\": \"{{sender_nationalId}}\",\n  \"receiverNationalId\": \"{{receiver_nationalId}}\",\n  \"amount\": 800,\n  \"currency\": \"TRY\",\n  \"description\": \"Transfer before customer block\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers"]
+                }
+              }
+            },
+            {
+              "name": "2. Verify Transfer is PENDING",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers", "{{transactionCode}}"]
+                },
+                "description": "Status should be PENDING"
+              }
+            },
+            {
+              "name": "3. Block Customer",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"newStatus\": \"Blocked\",\n  \"reason\": \"Testing auto-cancel of pending transfers\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl_customer}}/api/customers/{{sender_id}}/status",
+                  "host": ["{{baseUrl_customer}}"],
+                  "path": ["api", "customers", "{{sender_id}}", "status"]
+                },
+                "description": "RabbitMQ event will trigger auto-cancel of pending transfers"
+              }
+            },
+            {
+              "name": "4. Verify Transfer is CANCELLED",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers", "{{transactionCode}}"]
+                },
+                "description": "Status should be automatically changed to CANCELLED"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Scenario 7: Rate Limiting Test",
+          "item": [
+            {
+              "name": "Make Multiple Requests",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl_customer}}/api/customers?pageNumber=1&pageSize=10",
+                  "host": ["{{baseUrl_customer}}"],
+                  "path": ["api", "customers"],
+                  "query": [
+                    {
+                      "key": "pageNumber",
+                      "value": "1"
+                    },
+                    {
+                      "key": "pageSize",
+                      "value": "10"
+                    }
+                  ]
+                },
+                "description": "Run this 101 times to hit rate limit (100 req/min). Use Collection Runner with 101 iterations. Request #101 should return 429 Too Many Requests"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Scenario 8: Idempotency Test",
+          "item": [
+            {
+              "name": "1. Create Transfer with Idempotency Key",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "exec": [
+                      "// Generate a fixed idempotency key for this test",
+                      "pm.collectionVariables.set('test_idempotency_key', 'test-' + Date.now());"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200 || pm.response.code === 201) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.transactionCode) {",
+                      "        pm.collectionVariables.set('transactionCode', jsonData.data.transactionCode);",
+                      "        pm.collectionVariables.set('first_transfer_id', jsonData.data.id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  },
+                  {
+                    "key": "X-Idempotency-Key",
+                    "value": "{{test_idempotency_key}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"senderNationalId\": \"{{sender_nationalId}}\",\n  \"receiverNationalId\": \"{{receiver_nationalId}}\",\n  \"amount\": 600,\n  \"currency\": \"TRY\",\n  \"description\": \"Idempotency test - first request\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers"]
+                }
+              }
+            },
+            {
+              "name": "2. Retry Same Request (Same Idempotency Key)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200 || pm.response.code === 201) {",
+                      "    var jsonData = pm.response.json();",
+                      "    var firstId = pm.collectionVariables.get('first_transfer_id');",
+                      "    ",
+                      "    pm.test('Should return same transfer', function() {",
+                      "        pm.expect(jsonData.data.id).to.equal(firstId);",
+                      "    });",
+                      "    ",
+                      "    console.log('Idempotency working! Same transfer returned.');",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  },
+                  {
+                    "key": "X-Idempotency-Key",
+                    "value": "{{test_idempotency_key}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"senderNationalId\": \"{{sender_nationalId}}\",\n  \"receiverNationalId\": \"{{receiver_nationalId}}\",\n  \"amount\": 600,\n  \"currency\": \"TRY\",\n  \"description\": \"Idempotency test - retry (should return same transfer)\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers"]
+                },
+                "description": "Should return the SAME transfer as previous request (no duplicate)"
+              }
+            }
+          ]
         }
-      ]
-    }
-  ]
-}
