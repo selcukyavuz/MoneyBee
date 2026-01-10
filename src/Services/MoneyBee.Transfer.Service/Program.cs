@@ -11,6 +11,7 @@ using MoneyBee.Transfer.Service.Infrastructure.Messaging;
 using MoneyBee.Transfer.Service.Infrastructure.Metrics;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Serilog;
 using StackExchange.Redis;
 
@@ -75,7 +76,7 @@ builder.Services.AddScoped<ITransferCacheService, TransferCacheService>();
 // Metrics
 builder.Services.AddSingleton<TransferMetrics>();
 
-// OpenTelemetry Metrics
+// OpenTelemetry Metrics & Tracing
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(resource => resource
         .AddService(
@@ -86,7 +87,29 @@ builder.Services.AddOpenTelemetry()
         .AddMeter("MoneyBee.Transfer.Service")
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
-        .AddPrometheusExporter());
+        .AddPrometheusExporter())
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation(options =>
+        {
+            options.RecordException = true;
+            options.EnrichWithHttpRequest = (activity, request) =>
+            {
+                activity.SetTag("http.client_ip", request.HttpContext.Connection.RemoteIpAddress?.ToString());
+            };
+        })
+        .AddHttpClientInstrumentation(options =>
+        {
+            options.RecordException = true;
+        })
+        .AddEntityFrameworkCoreInstrumentation(options =>
+        {
+            options.SetDbStatementForText = true;
+            options.SetDbStatementForStoredProcedure = true;
+        })
+        .AddOtlpExporter(options =>
+        {
+            options.Endpoint = new Uri(builder.Configuration["Jaeger:Endpoint"] ?? "http://localhost:4317");
+        }));
 
 // DDD - Domain Services
 builder.Services.AddScoped<MoneyBee.Transfer.Service.Domain.Services.TransferDomainService>();
