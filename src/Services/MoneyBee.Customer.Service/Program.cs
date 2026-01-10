@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using MoneyBee.Common.DDD;
+using MoneyBee.Common.Persistence;
+using MoneyBee.Common.Services;
 using MoneyBee.Customer.Service.Application.DomainEventHandlers;
 using MoneyBee.Customer.Service.Application.Interfaces;
 using MoneyBee.Customer.Service.Domain.Events;
@@ -71,12 +73,16 @@ builder.Services.AddScoped<IDomainEventHandler<CustomerCreatedDomainEvent>, Cust
 builder.Services.AddScoped<IDomainEventHandler<CustomerDeletedDomainEvent>, CustomerDeletedDomainEventHandler>();
 builder.Services.AddScoped<IDomainEventHandler<CustomerStatusChangedDomainEvent>, CustomerStatusChangedDomainEventHandler>();
 
+// Unit of Work
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork<CustomerDbContext>>();
+
 // Infrastructure Services
 builder.Services.AddScoped<IKycService, KycService>();
 builder.Services.AddSingleton<IEventPublisher, RabbitMqEventPublisher>();
 
 // Background Services
 builder.Services.AddHostedService<KycRetryService>();
+builder.Services.AddHostedService<OutboxProcessor<CustomerDbContext>>();
 
 // Health Checks
 builder.Services.AddHealthChecks()

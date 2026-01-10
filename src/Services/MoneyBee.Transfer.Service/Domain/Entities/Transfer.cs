@@ -42,6 +42,12 @@ public class Transfer : AggregateRoot
     [MaxLength(100)]
     public string? IdempotencyKey { get; private set; }
 
+    /// <summary>
+    /// Row version for optimistic concurrency control
+    /// </summary>
+    [Timestamp]
+    public byte[]? RowVersion { get; private set; }
+
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
 
     public DateTime? CompletedAt { get; private set; }

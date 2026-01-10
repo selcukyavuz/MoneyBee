@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using MoneyBee.Transfer.Service.Infrastructure.Data;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MoneyBee.Transfer.Service.Migrations
 {
     [DbContext(typeof(TransferDbContext))]
-    partial class TransferDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260110122529_Add_RowVersion_For_OptimisticConcurrency")]
+    partial class Add_RowVersion_For_OptimisticConcurrency
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,60 +24,6 @@ namespace MoneyBee.Transfer.Service.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("MoneyBee.Common.Persistence.OutboxMessage", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("EventData")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("event_data");
-
-                    b.Property<string>("EventType")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("event_type");
-
-                    b.Property<DateTime?>("LastAttemptAt")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("last_attempt_at");
-
-                    b.Property<string>("LastError")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("last_error");
-
-                    b.Property<DateTime>("OccurredOn")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("occurred_on");
-
-                    b.Property<int>("ProcessAttempts")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("process_attempts");
-
-                    b.Property<bool>("Published")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("published");
-
-                    b.Property<DateTime?>("PublishedAt")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("published_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Published", "OccurredOn")
-                        .HasDatabaseName("ix_outbox_messages_published_occurred");
-
-                    b.ToTable("outbox_messages", (string)null);
-                });
 
             modelBuilder.Entity("MoneyBee.Transfer.Service.Domain.Entities.Transfer", b =>
                 {

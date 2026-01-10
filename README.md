@@ -367,10 +367,69 @@ docker-compose ps rabbitmq
 # Design-time migrations için infrastructure servislerinin çalışması gerekmez
 # IDesignTimeDbContextFactory ile migration oluşturulur
 
-# Eğer manuel migration gerekirse:
-cd src/Services/MoneyBee.{Service}.Service
-dotnet ef migrations add MigrationName
+# Migration oluşturma:
+cd src/Services/MoneyBee.Transfer.Service
+dotnet ef migrations add Add_RowVersion_For_OptimisticConcurrency
+
+# Migration çalıştırma:
+dotnet ef database update
 ```
+
+## 🛡️ Race Condition & Concurrency Solutions
+
+MoneyBee, production-grade race condition korumaları içerir:
+
+### 1. **Redis Distributed Lock**
+Daily limit kontrollerinde race condition önleme:
+```csharp
+var lockKey = $"customer:{customerId}:daily-limit";
+await _distributedLock.ExecuteWithLockAsync(lockKey, TimeSpan.FromSeconds(10), async () => {
+    var dailyTotal = await _repository.GetDailyTotalAsync(customerId, DateTime.Today);
+    ValidateDailyLimit(dailyTotal, amount, DAILY_LIMIT_TRY);
+});
+```
+
+### 2. **Optimistic Concurrency Control**
+Transfer update'lerinde RowVersion ile çakışma tespiti:
+```sql
+ALTER TABLE transfers ADD COLUMN row_version bytea;
+```
+
+Retry logic ile otomatik çözüm:
+```csharp
+for (int attempt = 0; attempt < 3; attempt++)
+{
+    try {
+        await UpdateTransferAsync(transfer);
+        break;
+    }
+    catch (DbUpdateConcurrencyException) {
+        // Exponential backoff ile retry
+    }
+}
+```
+
+### 3. **Idempotency Key**
+Duplicate transfer önleme:
+```csharp
+if (!string.IsNullOrWhiteSpace(request.IdempotencyKey))
+{
+    var existing = await GetByIdempotencyKeyAsync(request.IdempotencyKey);
+    if (existing != null) return existing; // Same result
+}
+```
+
+### 4. **Unit of Work Pattern**
+Atomik database + event dispatch:
+```csharp
+await _unitOfWork.SaveChangesAsync(); // DB save + event dispatch atomic
+```
+
+**Detaylı Bilgi:**
+- [docs/RaceConditionsAndConcurrency.md](docs/RaceConditionsAndConcurrency.md) - Detaylı analiz
+- [docs/RaceConditionImprovements.md](docs/RaceConditionImprovements.md) - Implementation guide
+- [docs/TroubleshootingAndSolutions.md](docs/TroubleshootingAndSolutions.md) - Sorun giderme
+- [RACE_CONDITION_FIXES.md](RACE_CONDITION_FIXES.md) - Quick reference
 
 ## 📖 API Documentation
 

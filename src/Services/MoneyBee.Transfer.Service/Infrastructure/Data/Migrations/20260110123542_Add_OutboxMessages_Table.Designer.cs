@@ -2,18 +2,21 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using MoneyBee.Transfer.Service.Infrastructure.Data;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace MoneyBee.Transfer.Service.Migrations
+namespace MoneyBee.Transfer.Service.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(TransferDbContext))]
-    partial class TransferDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260110123542_Add_OutboxMessages_Table")]
+    partial class Add_OutboxMessages_Table
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

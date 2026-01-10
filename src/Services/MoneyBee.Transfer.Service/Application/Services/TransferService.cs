@@ -1,6 +1,8 @@
+using Microsoft.EntityFrameworkCore;
 using MoneyBee.Common.DDD;
 using MoneyBee.Common.Enums;
 using MoneyBee.Common.Exceptions;
+using MoneyBee.Common.Services;
 using MoneyBee.Common.ValueObjects;
 using MoneyBee.Transfer.Service.Application.DTOs;
 using MoneyBee.Transfer.Service.Application.Interfaces;
@@ -19,6 +21,7 @@ public class TransferService : ITransferService
     private readonly IFraudDetectionService _fraudService;
     private readonly IExchangeRateService _exchangeRateService;
     private readonly IDomainEventDispatcher _domainEventDispatcher;
+    private readonly IDistributedLockService _distributedLock;
     private readonly TransferDomainService _domainService;
     private readonly ILogger<TransferService> _logger;
 
@@ -30,6 +33,7 @@ public class TransferService : ITransferService
         IFraudDetectionService fraudService,
         IExchangeRateService exchangeRateService,
         IDomainEventDispatcher domainEventDispatcher,
+        IDistributedLockService distributedLock,
         TransferDomainService domainService,
         ILogger<TransferService> logger)
     {
@@ -38,6 +42,7 @@ public class TransferService : ITransferService
         _fraudService = fraudService;
         _exchangeRateService = exchangeRateService;
         _domainEventDispatcher = domainEventDispatcher;
+        _distributedLock = distributedLock;
         _domainService = domainService;
         _logger = logger;
     }
@@ -108,9 +113,21 @@ public class TransferService : ITransferService
             amountInTRY = request.Amount;
         }
 
-        // Check daily limit using domain service
-        var dailyTotal = await _repository.GetDailyTotalAsync(sender.Id, DateTime.Today);
-        _domainService.ValidateDailyLimit(dailyTotal, amountInTRY, DAILY_LIMIT_TRY);
+        // Check daily limit with distributed lock to prevent race conditions
+        var lockKey = $"customer:{sender.Id}:daily-limit";
+        await _distributedLock.ExecuteWithLockAsync(
+            lockKey,
+            TimeSpan.FromSeconds(10),
+            async () =>
+            {
+                var dailyTotal = await _repository.GetDailyTotalAsync(sender.Id, DateTime.Today);
+                _domainService.ValidateDailyLimit(dailyTotal, amountInTRY, DAILY_LIMIT_TRY);
+                return true;
+            });
+
+        _logger.LogDebug(
+            "Daily limit check passed with lock for customer {CustomerId}: {DailyTotal} + {Amount} <= {Limit}",
+            sender.Id, await _repository.GetDailyTotalAsync(sender.Id, DateTime.Today), amountInTRY, DAILY_LIMIT_TRY);
 
         // Perform fraud check
         var fraudCheck = await _fraudService.CheckTransferAsync(
@@ -175,53 +192,109 @@ public class TransferService : ITransferService
 
     public async Task<TransferDto> CompleteTransferAsync(string transactionCode, CompleteTransferRequest request)
     {
-        var transfer = await _repository.GetByTransactionCodeAsync(transactionCode);
-
-        if (transfer == null)
+        const int maxRetries = 3;
+        
+        for (int attempt = 0; attempt < maxRetries; attempt++)
         {
-            throw new ArgumentException("Transfer not found");
+            try
+            {
+                var transfer = await _repository.GetByTransactionCodeAsync(transactionCode);
+
+                if (transfer == null)
+                {
+                    throw new ArgumentException("Transfer not found");
+                }
+
+                // Use domain service for validation
+                _domainService.ValidateTransferForCompletion(transfer, request.ReceiverNationalId);
+
+                // Use aggregate method to complete
+                transfer.Complete();
+
+                await _repository.UpdateAsync(transfer);
+
+                // Dispatch domain events
+                await _domainEventDispatcher.DispatchAsync(transfer.DomainEvents);
+                transfer.ClearDomainEvents();
+
+                _logger.LogInformation("Transfer completed: {TransferId} - Code: {TransactionCode}",
+                    transfer.Id, transfer.TransactionCode);
+
+                return MapToDto(transfer);
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                if (attempt == maxRetries - 1)
+                {
+                    _logger.LogError(ex, 
+                        "Concurrent update detected for transfer {TransactionCode} after {Attempts} attempts",
+                        transactionCode, maxRetries);
+                    throw new InvalidOperationException(
+                        "Transfer was modified by another user. Please refresh and try again.", ex);
+                }
+                
+                _logger.LogWarning(
+                    "Concurrent update detected for transfer {TransactionCode}. Retry attempt {Attempt}/{MaxRetries}",
+                    transactionCode, attempt + 1, maxRetries);
+                
+                // Exponential backoff
+                await Task.Delay(TimeSpan.FromMilliseconds(100 * (attempt + 1)));
+            }
         }
-
-        // Use domain service for validation
-        _domainService.ValidateTransferForCompletion(transfer, request.ReceiverNationalId);
-
-        // Use aggregate method to complete
-        transfer.Complete();
-
-        await _repository.UpdateAsync(transfer);
-
-        // Dispatch domain events
-        await _domainEventDispatcher.DispatchAsync(transfer.DomainEvents);
-        transfer.ClearDomainEvents();
-
-        _logger.LogInformation("Transfer completed: {TransferId} - Code: {TransactionCode}",
-            transfer.Id, transfer.TransactionCode);
-
-        return MapToDto(transfer);
+        
+        throw new InvalidOperationException("Failed to complete transfer after maximum retries.");
     }
 
     public async Task<TransferDto> CancelTransferAsync(string transactionCode, CancelTransferRequest request)
     {
-        var transfer = await _repository.GetByTransactionCodeAsync(transactionCode);
-
-        if (transfer == null)
+        const int maxRetries = 3;
+        
+        for (int attempt = 0; attempt < maxRetries; attempt++)
         {
-            throw new ArgumentException("Transfer not found");
+            try
+            {
+                var transfer = await _repository.GetByTransactionCodeAsync(transactionCode);
+
+                if (transfer == null)
+                {
+                    throw new ArgumentException("Transfer not found");
+                }
+
+                // Use aggregate method to cancel
+                transfer.Cancel(request.Reason);
+
+                await _repository.UpdateAsync(transfer);
+
+                // Dispatch domain events
+                await _domainEventDispatcher.DispatchAsync(transfer.DomainEvents);
+                transfer.ClearDomainEvents();
+
+                _logger.LogInformation("Transfer cancelled: {TransferId} - Reason: {Reason}",
+                    transfer.Id, request.Reason);
+
+                return MapToDto(transfer);
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                if (attempt == maxRetries - 1)
+                {
+                    _logger.LogError(ex,
+                        "Concurrent update detected for transfer {TransactionCode} after {Attempts} attempts",
+                        transactionCode, maxRetries);
+                    throw new InvalidOperationException(
+                        "Transfer was modified by another user. Please refresh and try again.", ex);
+                }
+                
+                _logger.LogWarning(
+                    "Concurrent update detected for transfer {TransactionCode}. Retry attempt {Attempt}/{MaxRetries}",
+                    transactionCode, attempt + 1, maxRetries);
+                
+                // Exponential backoff
+                await Task.Delay(TimeSpan.FromMilliseconds(100 * (attempt + 1)));
+            }
         }
-
-        // Use aggregate method to cancel
-        transfer.Cancel(request.Reason);
-
-        await _repository.UpdateAsync(transfer);
-
-        // Dispatch domain events
-        await _domainEventDispatcher.DispatchAsync(transfer.DomainEvents);
-        transfer.ClearDomainEvents();
-
-        _logger.LogInformation("Transfer cancelled: {TransferId} - Reason: {Reason}",
-            transfer.Id, request.Reason);
-
-        return MapToDto(transfer);
+        
+        throw new InvalidOperationException("Failed to cancel transfer after maximum retries.");
     }
 
     public async Task<TransferDto?> GetTransferByCodeAsync(string transactionCode)

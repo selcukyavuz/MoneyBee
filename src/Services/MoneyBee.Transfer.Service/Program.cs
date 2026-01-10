@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using MoneyBee.Common.DDD;
+using MoneyBee.Common.Persistence;
+using MoneyBee.Common.Services;
 using MoneyBee.Transfer.Service.Application.DomainEventHandlers;
 using MoneyBee.Transfer.Service.Domain.Events;
 using MoneyBee.Transfer.Service.Infrastructure.Data;
@@ -66,6 +68,12 @@ builder.Services.AddScoped<MoneyBee.Transfer.Service.Application.Interfaces.ITra
 // DDD - Domain Services
 builder.Services.AddScoped<MoneyBee.Transfer.Service.Domain.Services.TransferDomainService>();
 
+// Infrastructure Services
+builder.Services.AddSingleton<IDistributedLockService, RedisDistributedLockService>();
+
+// Unit of Work
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork<TransferDbContext>>();
+
 // DDD - Domain Event Handlers
 builder.Services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 builder.Services.AddScoped<IDomainEventHandler<TransferCreatedDomainEvent>, TransferCreatedDomainEventHandler>();
@@ -74,6 +82,7 @@ builder.Services.AddScoped<IDomainEventHandler<TransferCancelledDomainEvent>, Tr
 
 // Background Services
 builder.Services.AddHostedService<CustomerEventConsumer>();
+builder.Services.AddHostedService<OutboxProcessor<TransferDbContext>>();
 
 // Health Checks
 builder.Services.AddHealthChecks()

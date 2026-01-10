@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using MoneyBee.Common.DDD;
+using MoneyBee.Common.Persistence;
 using MoneyBee.Transfer.Service.Domain.Entities;
 using MoneyBee.Common.Enums;
 
@@ -11,10 +13,57 @@ public class TransferDbContext : DbContext
     }
 
     public DbSet<Domain.Entities.Transfer> Transfers { get; set; }
+    public DbSet<OutboxMessage> OutboxMessages { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // Ignore base classes that are not entities
+        modelBuilder.Ignore<DomainEvent>();
+        modelBuilder.Ignore<AggregateRoot>();
+
+        // Configure OutboxMessage
+        modelBuilder.Entity<OutboxMessage>(entity =>
+        {
+            entity.ToTable("outbox_messages");
+            
+            entity.HasKey(e => e.Id);
+            
+            entity.Property(e => e.EventType)
+                .HasColumnName("event_type")
+                .HasMaxLength(200)
+                .IsRequired();
+            
+            entity.Property(e => e.EventData)
+                .HasColumnName("event_data")
+                .IsRequired();
+            
+            entity.Property(e => e.OccurredOn)
+                .HasColumnName("occurred_on");
+            
+            entity.Property(e => e.Published)
+                .HasColumnName("published")
+                .HasDefaultValue(false);
+            
+            entity.Property(e => e.PublishedAt)
+                .HasColumnName("published_at");
+            
+            entity.Property(e => e.ProcessAttempts)
+                .HasColumnName("process_attempts")
+                .HasDefaultValue(0);
+            
+            entity.Property(e => e.LastError)
+                .HasColumnName("last_error")
+                .HasMaxLength(2000);
+            
+            entity.Property(e => e.LastAttemptAt)
+                .HasColumnName("last_attempt_at");
+            
+            // Indexes for efficient querying
+            entity.HasIndex(e => new { e.Published, e.OccurredOn })
+                .HasDatabaseName("ix_outbox_messages_published_occurred");
+        });
 
         modelBuilder.Entity<Domain.Entities.Transfer>(entity =>
         {
@@ -75,6 +124,12 @@ public class TransferDbContext : DbContext
             entity.Property(e => e.IdempotencyKey)
                 .HasColumnName("idempotency_key")
                 .HasMaxLength(100);
+            
+            // Optimistic concurrency control
+            entity.Property(e => e.RowVersion)
+                .HasColumnName("row_version")
+                .IsRowVersion()
+                .IsConcurrencyToken();
             
             entity.Property(e => e.CreatedAt)
                 .HasColumnName("created_at")
