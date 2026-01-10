@@ -95,6 +95,22 @@ services:
       timeout: 10s
       retries: 5
 
+  # Seq for Centralized Logging
+  seq:
+    image: datalust/seq:latest
+    container_name: moneybee-seq
+    environment:
+      ACCEPT_EULA: Y
+      SEQ_FIRSTRUN_ADMINPASSWORD: Admin123! #Admin123*
+    ports:
+      - "5341:80"     # Seq UI
+      - "5342:5341"   # Ingestion endpoint
+    volumes:
+      - seq-data:/data
+    networks:
+      - moneybee-network
+    restart: unless-stopped
+
   # External Services (Required by Case Study)
   fraud-service:
     image: bpnpay/fraud-service:latest
@@ -240,3 +256,4 @@ volumes:
   postgres-transfer-data:
   redis-data:
   rabbitmq-data:
+  seq-data:

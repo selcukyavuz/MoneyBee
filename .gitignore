@@ -48,6 +48,11 @@ _ReSharper*/
 *.db-shm
 *.db-wal
 
+# Logs
+logs/
+*.log
+*.json.log
+
 # Docker
 **/obj/Docker/
 
