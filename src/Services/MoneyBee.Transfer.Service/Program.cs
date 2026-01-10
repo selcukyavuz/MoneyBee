@@ -1,0 +1,101 @@
+using Microsoft.EntityFrameworkCore;
+using MoneyBee.Transfer.Service.Data;
+using MoneyBee.Transfer.Service.Services;
+using Serilog;
+using StackExchange.Redis;
+
+// PostgreSQL timestamp compatibility
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Configure Serilog
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .CreateLogger();
+
+builder.Host.UseSerilog();
+
+// Add services to the container
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new() { 
+        Title = "MoneyBee Transfer Service API", 
+        Version = "v1",
+        Description = "Money Transfer Management Service for MoneyBee Money Transfer System"
+    });
+    c.AddSecurityDefinition("ApiKey", new()
+    {
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Name = "X-API-Key",
+        Description = "API Key for authentication"
+    });
+});
+
+// Database
+builder.Services.AddDbContext<TransferDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Redis
+var redisConnectionString = builder.Configuration["Redis:ConnectionString"];
+builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnectionString!));
+
+// HTTP Clients
+builder.Services.AddHttpClient("FraudService");
+builder.Services.AddHttpClient("ExchangeRateService");
+builder.Services.AddHttpClient("CustomerService");
+
+// Services
+builder.Services.AddScoped<IFraudDetectionService, FraudDetectionService>();
+builder.Services.AddScoped<IExchangeRateService, ExchangeRateService>();
+builder.Services.AddScoped<ICustomerService, CustomerService>();
+
+// Background Services
+builder.Services.AddHostedService<CustomerEventConsumer>();
+
+// Health Checks
+builder.Services.AddHealthChecks()
+    .AddNpgSql(builder.Configuration.GetConnectionString("DefaultConnection")!, name: "database")
+    .AddRedis(redisConnectionString!, "redis");
+
+var app = builder.Build();
+
+// Run migrations automatically
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<TransferDbContext>();
+    try
+    {
+        await db.Database.MigrateAsync();
+        Log.Information("Database migrations applied successfully");
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, "Error applying database migrations");
+    }
+}
+
+// Configure the HTTP request pipeline
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseSerilogRequestLogging();
+
+app.MapControllers();
+
+// Health check endpoint
+app.MapHealthChecks("/health");
+
+Log.Information("MoneyBee Transfer Service starting...");
+
+app.Run();

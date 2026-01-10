@@ -1,0 +1,6 @@
+@MoneyBee.Auth.Service_HostAddress = http://localhost:5064
+
+GET {{MoneyBee.Auth.Service_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

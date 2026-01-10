@@ -1,0 +1,677 @@
+{
+  "info": {
+    "name": "MoneyBee API Collection",
+    "description": "MoneyBee Money Transfer System API endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl_auth",
+      "value": "http://localhost:5001",
+      "type": "string"
+    },
+    {
+      "key": "baseUrl_customer",
+      "value": "http://localhost:5002",
+      "type": "string"
+    },
+    {
+      "key": "baseUrl_transfer",
+      "value": "http://localhost:5003",
+      "type": "string"
+    },
+    {
+      "key": "apiKey",
+      "value": "your-api-key-here",
+      "type": "string"
+    },
+    {
+      "key": "sender_nationalId",
+      "value": "12345678901",
+      "type": "string"
+    },
+    {
+      "key": "receiver_nationalId",
+      "value": "98765432109",
+      "type": "string"
+    },
+    {
+      "key": "sender_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "receiver_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "transactionCode",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth Service",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl_auth}}/health",
+              "host": ["{{baseUrl_auth}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "Create API Key",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.key) {",
+                  "        pm.collectionVariables.set('apiKey', jsonData.data.key);",
+                  "        console.log('API Key saved:', jsonData.data.key);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Application\",\n  \"description\": \"API key for testing MoneyBee services\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl_auth}}/api/auth/keys",
+              "host": ["{{baseUrl_auth}}"],
+              "path": ["api", "auth", "keys"]
+            }
+          }
+        },
+        {
+          "name": "Get All API Keys",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl_auth}}/api/auth/keys",
+              "host": ["{{baseUrl_auth}}"],
+              "path": ["api", "auth", "keys"]
+            }
+          }
+        },
+        {
+          "name": "Validate API Key",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"{{apiKey}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl_auth}}/api/auth/keys/validate",
+              "host": ["{{baseUrl_auth}}"],
+              "path": ["api", "auth", "keys", "validate"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customer Service",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl_customer}}/health",
+              "host": ["{{baseUrl_customer}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "Create Sender Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.id) {",
+                  "        pm.collectionVariables.set('sender_id', jsonData.data.id);",
+                  "        console.log('Sender ID saved:', jsonData.data.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nationalId\": \"{{sender_nationalId}}\",\n  \"firstName\": \"Ahmet\",\n  \"lastName\": \"Yılmaz\",\n  \"email\": \"ahmet.yilmaz@example.com\",\n  \"phoneNumber\": \"+905551234567\",\n  \"dateOfBirth\": \"1990-01-15\",\n  \"customerType\": \"Individual\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl_customer}}/api/customers",
+              "host": ["{{baseUrl_customer}}"],
+              "path": ["api", "customers"]
+            }
+          }
+        },
+        {
+          "name": "Create Receiver Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.id) {",
+                  "        pm.collectionVariables.set('receiver_id', jsonData.data.id);",
+                  "        console.log('Receiver ID saved:', jsonData.data.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nationalId\": \"{{receiver_nationalId}}\",\n  \"firstName\": \"Mehmet\",\n  \"lastName\": \"Demir\",\n  \"email\": \"mehmet.demir@example.com\",\n  \"phoneNumber\": \"+905559876543\",\n  \"dateOfBirth\": \"1985-05-20\",\n  \"customerType\": \"Individual\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl_customer}}/api/customers",
+              "host": ["{{baseUrl_customer}}"],
+              "path": ["api", "customers"]
+            }
+          }
+        },
+        {
+          "name": "Get All Customers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl_customer}}/api/customers?pageNumber=1&pageSize=10",
+              "host": ["{{baseUrl_customer}}"],
+              "path": ["api", "customers"],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Verify Customer by National ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl_customer}}/api/customers/verify/{{sender_nationalId}}",
+              "host": ["{{baseUrl_customer}}"],
+              "path": ["api", "customers", "verify", "{{sender_nationalId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Customer Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newStatus\": \"Suspended\",\n  \"reason\": \"Testing status change\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl_customer}}/api/customers/{{sender_id}}/status",
+              "host": ["{{baseUrl_customer}}"],
+              "path": ["api", "customers", "{{sender_id}}", "status"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transfer Service",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl_transfer}}/health",
+              "host": ["{{baseUrl_transfer}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "Create Transfer (Low Amount)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.transactionCode) {",
+                  "        pm.collectionVariables.set('transactionCode', jsonData.data.transactionCode);",
+                  "        console.log('Transaction Code saved:', jsonData.data.transactionCode);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senderNationalId\": \"{{sender_nationalId}}\",\n  \"receiverNationalId\": \"{{receiver_nationalId}}\",\n  \"amount\": 500,\n  \"currency\": \"TRY\",\n  \"description\": \"Test transfer - low amount\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl_transfer}}/api/transfers",
+              "host": ["{{baseUrl_transfer}}"],
+              "path": ["api", "transfers"]
+            }
+          }
+        },
+        {
+          "name": "Create Transfer (High Amount)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senderNationalId\": \"{{sender_nationalId}}\",\n  \"receiverNationalId\": \"{{receiver_nationalId}}\",\n  \"amount\": 5000,\n  \"currency\": \"TRY\",\n  \"description\": \"Test transfer - high amount (requires 5 min wait)\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl_transfer}}/api/transfers",
+              "host": ["{{baseUrl_transfer}}"],
+              "path": ["api", "transfers"]
+            }
+          }
+        },
+        {
+          "name": "Create Transfer (USD)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senderNationalId\": \"{{sender_nationalId}}\",\n  \"receiverNationalId\": \"{{receiver_nationalId}}\",\n  \"amount\": 100,\n  \"currency\": \"USD\",\n  \"description\": \"Test transfer - USD currency\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl_transfer}}/api/transfers",
+              "host": ["{{baseUrl_transfer}}"],
+              "path": ["api", "transfers"]
+            }
+          }
+        },
+        {
+          "name": "Get Transfer by Code",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}",
+              "host": ["{{baseUrl_transfer}}"],
+              "path": ["api", "transfers", "{{transactionCode}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Customer Transfers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl_transfer}}/api/transfers/customer/{{sender_id}}?pageNumber=1&pageSize=10",
+              "host": ["{{baseUrl_transfer}}"],
+              "path": ["api", "transfers", "customer", "{{sender_id}}"],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Complete Transfer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nationalId\": \"{{sender_nationalId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}/complete",
+              "host": ["{{baseUrl_transfer}}"],
+              "path": ["api", "transfers", "{{transactionCode}}", "complete"]
+            }
+          }
+        },
+        {
+          "name": "Cancel Transfer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nationalId\": \"{{sender_nationalId}}\",\n  \"reason\": \"Test cancellation\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}/cancel",
+              "host": ["{{baseUrl_transfer}}"],
+              "path": ["api", "transfers", "{{transactionCode}}", "cancel"]
+            }
+          }
+        },
+        {
+          "name": "Check Daily Limit",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl_transfer}}/api/transfers/limit/{{sender_id}}",
+              "host": ["{{baseUrl_transfer}}"],
+              "path": ["api", "transfers", "limit", "{{sender_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "End-to-End Scenarios",
+      "item": [
+        {
+          "name": "Scenario 1: Happy Path",
+          "item": [
+            {
+              "name": "1. Create API Key",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Happy Path Test\",\n  \"description\": \"Testing complete flow\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl_auth}}/api/auth/keys",
+                  "host": ["{{baseUrl_auth}}"],
+                  "path": ["api", "auth", "keys"]
+                }
+              }
+            },
+            {
+              "name": "2. Create Sender",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nationalId\": \"{{sender_nationalId}}\",\n  \"firstName\": \"Ahmet\",\n  \"lastName\": \"Yılmaz\",\n  \"email\": \"ahmet@example.com\",\n  \"phoneNumber\": \"+905551234567\",\n  \"dateOfBirth\": \"1990-01-15\",\n  \"customerType\": \"Individual\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl_customer}}/api/customers",
+                  "host": ["{{baseUrl_customer}}"],
+                  "path": ["api", "customers"]
+                }
+              }
+            },
+            {
+              "name": "3. Create Receiver",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nationalId\": \"{{receiver_nationalId}}\",\n  \"firstName\": \"Mehmet\",\n  \"lastName\": \"Demir\",\n  \"email\": \"mehmet@example.com\",\n  \"phoneNumber\": \"+905559876543\",\n  \"dateOfBirth\": \"1985-05-20\",\n  \"customerType\": \"Individual\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl_customer}}/api/customers",
+                  "host": ["{{baseUrl_customer}}"],
+                  "path": ["api", "customers"]
+                }
+              }
+            },
+            {
+              "name": "4. Create Transfer",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  },
+                  {
+                    "key": "X-Idempotency-Key",
+                    "value": "{{$guid}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"senderNationalId\": \"{{sender_nationalId}}\",\n  \"receiverNationalId\": \"{{receiver_nationalId}}\",\n  \"amount\": 500,\n  \"currency\": \"TRY\",\n  \"description\": \"Happy path test transfer\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers"]
+                }
+              }
+            },
+            {
+              "name": "5. Complete Transfer",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nationalId\": \"{{sender_nationalId}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}/complete",
+                  "host": ["{{baseUrl_transfer}}"],
+                  "path": ["api", "transfers", "{{transactionCode}}", "complete"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

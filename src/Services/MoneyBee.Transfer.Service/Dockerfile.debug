@@ -1,0 +1,25 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS debug
+
+WORKDIR /app
+EXPOSE 80
+EXPOSE 5013
+
+# Install debugger
+RUN apt-get update && apt-get install -y unzip && \
+    curl -sSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l /vsdbg
+
+# Copy project files
+COPY ["src/Services/MoneyBee.Transfer.Service/MoneyBee.Transfer.Service.csproj", "service/"]
+COPY ["src/Shared/MoneyBee.Common/MoneyBee.Common.csproj", "common/"]
+
+# Restore
+RUN dotnet restore "service/MoneyBee.Transfer.Service.csproj"
+
+# Copy source code
+COPY ["src/Services/MoneyBee.Transfer.Service/", "service/"]
+COPY ["src/Shared/MoneyBee.Common/", "common/"]
+
+WORKDIR /app/service
+
+# Run with hot reload
+ENTRYPOINT ["dotnet", "watch", "run", "--no-hot-reload", "--urls", "http://+:80"]
