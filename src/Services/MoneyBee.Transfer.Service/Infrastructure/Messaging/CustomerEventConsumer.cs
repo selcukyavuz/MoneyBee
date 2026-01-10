@@ -158,7 +158,7 @@ public class CustomerEventConsumer : BackgroundService
 
                 foreach (var transfer in pendingTransfers)
                 {
-                    transfer.Status = TransferStatus.Cancelled;
+                    transfer.Cancel($"Customer {customerEvent.CustomerId} was blocked");
 
                     _logger.LogInformation(
                         "Cancelled transfer {TransactionCode} due to customer {CustomerId} being blocked",

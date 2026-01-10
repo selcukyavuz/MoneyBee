@@ -1,9 +1,11 @@
+using MoneyBee.Common.DDD;
 using MoneyBee.Common.Enums;
 using MoneyBee.Common.Events;
+using MoneyBee.Common.ValueObjects;
 using MoneyBee.Customer.Service.Application.DTOs;
 using MoneyBee.Customer.Service.Application.Interfaces;
 using MoneyBee.Customer.Service.Domain.Interfaces;
-using MoneyBee.Customer.Service.Helpers;
+using MoneyBee.Customer.Service.Domain.Services;
 using MoneyBee.Customer.Service.Infrastructure.ExternalServices;
 using MoneyBee.Customer.Service.Infrastructure.Messaging;
 using CustomerEntity = MoneyBee.Customer.Service.Domain.Entities.Customer;
@@ -15,89 +17,81 @@ public class CustomerService : ICustomerService
     private readonly ICustomerRepository _repository;
     private readonly IKycService _kycService;
     private readonly IEventPublisher _eventPublisher;
+    private readonly IDomainEventDispatcher _domainEventDispatcher;
+    private readonly CustomerDomainService _domainService;
     private readonly ILogger<CustomerService> _logger;
 
     public CustomerService(
         ICustomerRepository repository,
         IKycService kycService,
         IEventPublisher eventPublisher,
+        IDomainEventDispatcher domainEventDispatcher,
+        CustomerDomainService domainService,
         ILogger<CustomerService> logger)
     {
         _repository = repository;
         _kycService = kycService;
         _eventPublisher = eventPublisher;
+        _domainEventDispatcher = domainEventDispatcher;
+        _domainService = domainService;
         _logger = logger;
     }
 
     public async Task<CustomerDto> CreateCustomerAsync(CreateCustomerRequest request)
     {
-        // Validate National ID format
-        var normalizedNationalId = NationalIdValidator.Normalize(request.NationalId);
-        if (!NationalIdValidator.IsValid(normalizedNationalId))
-        {
-            throw new ArgumentException("Invalid National ID format");
-        }
-
-        // Check age requirement (18+)
-        var age = DateTime.Today.Year - request.DateOfBirth.Year;
-        if (request.DateOfBirth.Date > DateTime.Today.AddYears(-age)) age--;
-        
-        if (age < 18)
-        {
-            throw new ArgumentException("Customer must be at least 18 years old");
-        }
+        // Validate National ID using Value Object
+        var nationalId = NationalId.Create(request.NationalId);
 
         // Check if customer already exists
-        var existingCustomer = await _repository.GetByNationalIdAsync(normalizedNationalId);
+        var existingCustomer = await _repository.GetByNationalIdAsync(nationalId.Value);
         if (existingCustomer != null)
         {
             throw new InvalidOperationException("Customer with this National ID already exists");
         }
 
-        // Corporate customers must have tax number
-        if (request.CustomerType == CustomerType.Corporate && string.IsNullOrWhiteSpace(request.TaxNumber))
-        {
-            throw new ArgumentException("Tax number is required for corporate customers");
-        }
+        // Create customer aggregate using factory method
+        var customer = CustomerEntity.Create(
+            request.FirstName,
+            request.LastName,
+            nationalId.Value,
+            request.PhoneNumber,
+            DateTime.SpecifyKind(request.DateOfBirth, DateTimeKind.Utc),
+            request.CustomerType,
+            request.TaxNumber,
+            request.Address,
+            request.Email);
+
+        // Use domain service for validation
+        _domainService.ValidateCustomerForCreation(customer);
 
         // Perform KYC verification (non-blocking)
         var kycResult = await _kycService.VerifyCustomerAsync(
-            normalizedNationalId,
+            nationalId.Value,
             request.FirstName,
             request.LastName,
             request.DateOfBirth);
 
-        if (!kycResult.IsVerified)
+        if (kycResult.IsVerified)
+        {
+            customer.VerifyKyc();
+        }
+        else
         {
             _logger.LogWarning("KYC verification failed for {NationalId}: {Message}. Customer will be created with unverified status.",
-                normalizedNationalId, kycResult.Message);
+                nationalId.Value, kycResult.Message);
         }
 
-        // Create customer entity
-        var customer = new CustomerEntity
-        {
-            Id = Guid.NewGuid(),
-            FirstName = request.FirstName,
-            LastName = request.LastName,
-            NationalId = normalizedNationalId,
-            PhoneNumber = request.PhoneNumber,
-            DateOfBirth = DateTime.SpecifyKind(request.DateOfBirth, DateTimeKind.Utc),
-            CustomerType = request.CustomerType,
-            Status = CustomerStatus.Active,
-            KycVerified = kycResult.IsVerified,
-            TaxNumber = request.TaxNumber,
-            Address = request.Address,
-            Email = request.Email,
-            CreatedAt = DateTime.UtcNow
-        };
-
         await _repository.CreateAsync(customer);
+
+        // Dispatch domain events to handlers
+        await _domainEventDispatcher.DispatchAsync(customer.DomainEvents);
+        customer.ClearDomainEvents();
 
         var logMessage = kycResult.IsVerified 
             ? "Customer created with verified KYC" 
             : "Customer created with unverified KYC - verification will be retried";
         
-        _logger.LogInformation("{LogMessage}: {CustomerId} - {NationalId}", logMessage, customer.Id, normalizedNationalId);
+        _logger.LogInformation("{LogMessage}: {CustomerId} - {NationalId}", logMessage, customer.Id, nationalId.Value);
 
         return MapToDto(customer);
     }
@@ -116,8 +110,8 @@ public class CustomerService : ICustomerService
 
     public async Task<CustomerDto?> GetCustomerByNationalIdAsync(string nationalId)
     {
-        var normalized = NationalIdValidator.Normalize(nationalId);
-        var customer = await _repository.GetByNationalIdAsync(normalized);
+        var nationalIdVO = NationalId.Create(nationalId);
+        var customer = await _repository.GetByNationalIdAsync(nationalIdVO.Value);
         return customer != null ? MapToDto(customer) : null;
     }
 
@@ -127,22 +121,13 @@ public class CustomerService : ICustomerService
         if (customer == null)
             return null;
 
-        if (!string.IsNullOrWhiteSpace(request.FirstName))
-            customer.FirstName = request.FirstName;
-
-        if (!string.IsNullOrWhiteSpace(request.LastName))
-            customer.LastName = request.LastName;
-
-        if (!string.IsNullOrWhiteSpace(request.PhoneNumber))
-            customer.PhoneNumber = request.PhoneNumber;
-
-        if (!string.IsNullOrWhiteSpace(request.Address))
-            customer.Address = request.Address;
-
-        if (!string.IsNullOrWhiteSpace(request.Email))
-            customer.Email = request.Email;
-
-        customer.UpdatedAt = DateTime.UtcNow;
+        // Use aggregate method to update information
+        customer.UpdateInformation(
+            request.FirstName ?? customer.FirstName,
+            request.LastName ?? customer.LastName,
+            request.PhoneNumber ?? customer.PhoneNumber,
+            request.Address ?? customer.Address,
+            request.Email ?? customer.Email);
 
         await _repository.UpdateAsync(customer);
 
@@ -157,24 +142,20 @@ public class CustomerService : ICustomerService
         if (customer == null)
             return false;
 
-        var oldStatus = customer.Status;
-        customer.Status = request.Status;
-        customer.UpdatedAt = DateTime.UtcNow;
+        // Use domain service for validation
+        _domainService.ValidateCustomerUpdate(customer, request.Status);
+
+        // Use aggregate method to update status
+        customer.UpdateStatus(request.Status);
 
         await _repository.UpdateAsync(customer);
 
         _logger.LogInformation("Customer status updated: {CustomerId} from {OldStatus} to {NewStatus}. Reason: {Reason}",
-            id, oldStatus, request.Status, request.Reason);
+            id, customer.Status, request.Status, request.Reason);
 
-        // Publish status changed event
-        await _eventPublisher.PublishAsync(new CustomerStatusChangedEvent
-        {
-            CustomerId = customer.Id,
-            PreviousStatus = oldStatus.ToString(),
-            NewStatus = customer.Status.ToString(),
-            Reason = request.Reason,
-            CorrelationId = Guid.NewGuid().ToString()
-        });
+        // Dispatch domain events
+        await _domainEventDispatcher.DispatchAsync(customer.DomainEvents);
+        customer.ClearDomainEvents();
 
         return true;
     }
@@ -185,11 +166,18 @@ public class CustomerService : ICustomerService
         if (customer == null)
             return false;
 
+        // Mark for deletion and raise domain event
+        customer.MarkForDeletion();
+
         var deleted = await _repository.DeleteAsync(id);
 
         if (deleted)
         {
             _logger.LogWarning("Customer deleted: {CustomerId}", id);
+
+            // Dispatch domain events
+            await _domainEventDispatcher.DispatchAsync(customer.DomainEvents);
+            customer.ClearDomainEvents();
         }
 
         return deleted;
@@ -197,46 +185,53 @@ public class CustomerService : ICustomerService
 
     public async Task<CustomerVerificationResponse> VerifyCustomerAsync(string nationalId)
     {
-        var normalized = NationalIdValidator.Normalize(nationalId);
-        
-        if (!NationalIdValidator.IsValid(normalized))
+        // Use Value Object for validation
+        try
         {
-            return new CustomerVerificationResponse
+            var nationalIdVO = NationalId.Create(nationalId);
+            var normalized = nationalIdVO.Value;
+
+            var customer = await _repository.GetByNationalIdAsync(normalized);
+
+            if (customer == null)
             {
-                Exists = false,
-                Message = "Invalid National ID format"
-            };
-        }
+                return new CustomerVerificationResponse
+                {
+                    Exists = false,
+                    Message = "Customer not found"
+                };
+            }
 
-        var customer = await _repository.GetByNationalIdAsync(normalized);
+            // Use domain service to check if customer can send transfers
+            var canSend = _domainService.CanCustomerSendTransfer(customer);
 
-        if (customer == null)
-        {
-            return new CustomerVerificationResponse
+            if (!canSend)
             {
-                Exists = false,
-                Message = "Customer not found"
-            };
-        }
+                return new CustomerVerificationResponse
+                {
+                    Exists = true,
+                    CustomerId = customer.Id,
+                    IsActive = false,
+                    Message = $"Customer exists but status is {customer.Status}"
+                };
+            }
 
-        if (customer.Status != CustomerStatus.Active)
-        {
             return new CustomerVerificationResponse
             {
                 Exists = true,
                 CustomerId = customer.Id,
-                IsActive = false,
-                Message = $"Customer exists but status is {customer.Status}"
+                IsActive = true,
+                Message = "Customer found and active"
             };
         }
-
-        return new CustomerVerificationResponse
+        catch (ArgumentException ex)
         {
-            Exists = true,
-            CustomerId = customer.Id,
-            IsActive = true,
-            Message = "Customer found and active"
-        };
+            return new CustomerVerificationResponse
+            {
+                Exists = false,
+                Message = ex.Message
+            };
+        }
     }
 
     private static CustomerDto MapToDto(CustomerEntity customer)

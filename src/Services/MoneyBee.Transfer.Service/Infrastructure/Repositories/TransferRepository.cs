@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using MoneyBee.Common.DDD;
 using MoneyBee.Common.Enums;
 using TransferEntity = MoneyBee.Transfer.Service.Domain.Entities.Transfer;
 using MoneyBee.Transfer.Service.Domain.Interfaces;
@@ -49,6 +50,13 @@ public class TransferRepository : ITransferRepository
                        t.CreatedAt >= startOfDay &&
                        (t.Status == TransferStatus.Pending || t.Status == TransferStatus.Completed))
             .SumAsync(t => t.AmountInTRY);
+    }
+
+    public async Task<IEnumerable<TransferEntity>> FindAsync(ISpecification<TransferEntity> specification)
+    {
+        return await _context.Transfers
+            .Where(specification.ToExpression())
+            .ToListAsync();
     }
 
     public async Task<TransferEntity> CreateAsync(TransferEntity transfer)

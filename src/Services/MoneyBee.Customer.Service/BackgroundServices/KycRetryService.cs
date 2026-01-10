@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MoneyBee.Customer.Service.Domain.Interfaces;
+using MoneyBee.Customer.Service.Domain.Specifications;
 using MoneyBee.Customer.Service.Infrastructure.ExternalServices;
 
 namespace MoneyBee.Customer.Service.BackgroundServices;
@@ -43,8 +44,9 @@ public class KycRetryService : BackgroundService
         var repository = scope.ServiceProvider.GetRequiredService<ICustomerRepository>();
         var kycService = scope.ServiceProvider.GetRequiredService<IKycService>();
 
-        // Get unverified customers (created in last 24 hours)
-        var unverifiedCustomers = await repository.GetUnverifiedKycCustomersAsync(24);
+        // ✅ Use Specification Pattern - get unverified customers (created in last 24 hours)
+        var specification = new UnverifiedKycCustomerSpecification(hoursThreshold: 24);
+        var unverifiedCustomers = await repository.FindAsync(specification);
 
         if (!unverifiedCustomers.Any())
         {

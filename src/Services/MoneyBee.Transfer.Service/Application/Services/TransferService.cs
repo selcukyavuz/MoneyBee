@@ -1,9 +1,12 @@
+using MoneyBee.Common.DDD;
 using MoneyBee.Common.Enums;
 using MoneyBee.Common.Exceptions;
+using MoneyBee.Common.ValueObjects;
 using MoneyBee.Transfer.Service.Application.DTOs;
 using MoneyBee.Transfer.Service.Application.Interfaces;
 using TransferEntity = MoneyBee.Transfer.Service.Domain.Entities.Transfer;
 using MoneyBee.Transfer.Service.Domain.Interfaces;
+using MoneyBee.Transfer.Service.Domain.Services;
 using MoneyBee.Transfer.Service.Helpers;
 using MoneyBee.Transfer.Service.Infrastructure.ExternalServices;
 
@@ -15,22 +18,27 @@ public class TransferService : ITransferService
     private readonly ICustomerService _customerService;
     private readonly IFraudDetectionService _fraudService;
     private readonly IExchangeRateService _exchangeRateService;
+    private readonly IDomainEventDispatcher _domainEventDispatcher;
+    private readonly TransferDomainService _domainService;
     private readonly ILogger<TransferService> _logger;
 
     private const decimal DAILY_LIMIT_TRY = 10000m;
-    private const decimal HIGH_AMOUNT_THRESHOLD_TRY = 1000m;
 
     public TransferService(
         ITransferRepository repository,
         ICustomerService customerService,
         IFraudDetectionService fraudService,
         IExchangeRateService exchangeRateService,
+        IDomainEventDispatcher domainEventDispatcher,
+        TransferDomainService domainService,
         ILogger<TransferService> logger)
     {
         _repository = repository;
         _customerService = customerService;
         _fraudService = fraudService;
         _exchangeRateService = exchangeRateService;
+        _domainEventDispatcher = domainEventDispatcher;
+        _domainService = domainService;
         _logger = logger;
     }
 
@@ -100,42 +108,31 @@ public class TransferService : ITransferService
             amountInTRY = request.Amount;
         }
 
-        // Check daily limit
+        // Check daily limit using domain service
         var dailyTotal = await _repository.GetDailyTotalAsync(sender.Id, DateTime.Today);
-        var remainingLimit = DAILY_LIMIT_TRY - dailyTotal;
-        
-        if (remainingLimit < amountInTRY)
-        {
-            throw new InvalidOperationException($"Daily transfer limit exceeded. Remaining: {remainingLimit:F2} TRY");
-        }
+        _domainService.ValidateDailyLimit(dailyTotal, amountInTRY, DAILY_LIMIT_TRY);
 
         // Perform fraud check
         var fraudCheck = await _fraudService.CheckTransferAsync(
             sender.Id, receiver.Id, amountInTRY, sender.NationalId);
 
-        // Reject if HIGH risk
-        if (fraudCheck.RiskLevel == RiskLevel.High)
+        // Reject if HIGH risk using domain service
+        if (_domainService.ShouldRejectTransfer(fraudCheck.RiskLevel))
         {
             _logger.LogWarning("Transfer rejected due to HIGH risk: Sender={SenderId}", sender.Id);
             
-            var rejectedTransfer = new TransferEntity
-            {
-                Id = Guid.NewGuid(),
-                SenderId = sender.Id,
-                ReceiverId = receiver.Id,
-                Amount = request.Amount,
-                Currency = request.Currency,
-                AmountInTRY = amountInTRY,
-                ExchangeRate = exchangeRate,
-                TransactionFee = 0,
-                TransactionCode = TransactionCodeGenerator.Generate(),
-                Status = TransferStatus.Failed,
-                RiskLevel = fraudCheck.RiskLevel,
-                IdempotencyKey = request.IdempotencyKey,
-                SenderNationalId = sender.NationalId,
-                ReceiverNationalId = receiver.NationalId,
-                CreatedAt = DateTime.UtcNow
-            };
+            var rejectedTransfer = TransferEntity.CreateFailed(
+                sender.Id,
+                receiver.Id,
+                request.Amount,
+                request.Currency,
+                amountInTRY,
+                exchangeRate,
+                TransactionCodeGenerator.Generate(),
+                fraudCheck.RiskLevel,
+                request.IdempotencyKey,
+                sender.NationalId,
+                receiver.NationalId);
 
             await _repository.CreateAsync(rejectedTransfer);
 
@@ -145,35 +142,30 @@ public class TransferService : ITransferService
         // Calculate fee
         var transactionFee = FeeCalculator.Calculate(amountInTRY);
 
-        // Determine if approval wait is needed (>1000 TRY)
-        DateTime? approvalRequiredUntil = null;
-        if (amountInTRY > HIGH_AMOUNT_THRESHOLD_TRY)
-        {
-            approvalRequiredUntil = DateTime.UtcNow.AddMinutes(5);
-        }
+        // Use domain service to determine approval wait
+        var approvalRequiredUntil = _domainService.CalculateApprovalWaitTime(amountInTRY);
 
-        // Create transfer
-        var transfer = new TransferEntity
-        {
-            Id = Guid.NewGuid(),
-            SenderId = sender.Id,
-            ReceiverId = receiver.Id,
-            Amount = request.Amount,
-            Currency = request.Currency,
-            AmountInTRY = amountInTRY,
-            ExchangeRate = exchangeRate,
-            TransactionFee = transactionFee,
-            TransactionCode = await GenerateUniqueTransactionCodeAsync(),
-            Status = TransferStatus.Pending,
-            RiskLevel = fraudCheck.RiskLevel,
-            IdempotencyKey = request.IdempotencyKey,
-            ApprovalRequiredUntil = approvalRequiredUntil,
-            SenderNationalId = sender.NationalId,
-            ReceiverNationalId = receiver.NationalId,
-            CreatedAt = DateTime.UtcNow
-        };
+        // Create transfer using aggregate factory method
+        var transfer = TransferEntity.Create(
+            sender.Id,
+            receiver.Id,
+            request.Amount,
+            request.Currency,
+            amountInTRY,
+            exchangeRate,
+            transactionFee,
+            await GenerateUniqueTransactionCodeAsync(),
+            fraudCheck.RiskLevel,
+            request.IdempotencyKey,
+            approvalRequiredUntil,
+            sender.NationalId,
+            receiver.NationalId);
 
         await _repository.CreateAsync(transfer);
+
+        // Dispatch domain events to handlers
+        await _domainEventDispatcher.DispatchAsync(transfer.DomainEvents);
+        transfer.ClearDomainEvents();
 
         _logger.LogInformation("Transfer created: {TransferId} - Code: {TransactionCode}, Amount: {Amount} {Currency}",
             transfer.Id, transfer.TransactionCode, transfer.Amount, transfer.Currency);
@@ -190,30 +182,17 @@ public class TransferService : ITransferService
             throw new ArgumentException("Transfer not found");
         }
 
-        if (transfer.Status != TransferStatus.Pending)
-        {
-            throw new InvalidOperationException($"Transfer cannot be completed. Status: {transfer.Status}");
-        }
+        // Use domain service for validation
+        _domainService.ValidateTransferForCompletion(transfer, request.ReceiverNationalId);
 
-        // Verify receiver identity
-        if (transfer.ReceiverNationalId != request.ReceiverNationalId)
-        {
-            _logger.LogWarning("Identity verification failed for transfer completion: {TransferId}", transfer.Id);
-            throw new ArgumentException("Receiver identity verification failed");
-        }
-
-        // Check if approval wait period is over
-        if (transfer.ApprovalRequiredUntil.HasValue && transfer.ApprovalRequiredUntil.Value > DateTime.UtcNow)
-        {
-            var remainingMinutes = (transfer.ApprovalRequiredUntil.Value - DateTime.UtcNow).TotalMinutes;
-            throw new InvalidOperationException(
-                $"Transfer approval required. Please wait {Math.Ceiling(remainingMinutes)} more minute(s)");
-        }
-
-        transfer.Status = TransferStatus.Completed;
-        transfer.CompletedAt = DateTime.UtcNow;
+        // Use aggregate method to complete
+        transfer.Complete();
 
         await _repository.UpdateAsync(transfer);
+
+        // Dispatch domain events
+        await _domainEventDispatcher.DispatchAsync(transfer.DomainEvents);
+        transfer.ClearDomainEvents();
 
         _logger.LogInformation("Transfer completed: {TransferId} - Code: {TransactionCode}",
             transfer.Id, transfer.TransactionCode);
@@ -230,16 +209,14 @@ public class TransferService : ITransferService
             throw new ArgumentException("Transfer not found");
         }
 
-        if (transfer.Status != TransferStatus.Pending)
-        {
-            throw new InvalidOperationException($"Transfer cannot be cancelled. Status: {transfer.Status}");
-        }
-
-        transfer.Status = TransferStatus.Cancelled;
-        transfer.CancelledAt = DateTime.UtcNow;
-        transfer.CancellationReason = request.Reason;
+        // Use aggregate method to cancel
+        transfer.Cancel(request.Reason);
 
         await _repository.UpdateAsync(transfer);
+
+        // Dispatch domain events
+        await _domainEventDispatcher.DispatchAsync(transfer.DomainEvents);
+        transfer.ClearDomainEvents();
 
         _logger.LogInformation("Transfer cancelled: {TransferId} - Reason: {Reason}",
             transfer.Id, request.Reason);

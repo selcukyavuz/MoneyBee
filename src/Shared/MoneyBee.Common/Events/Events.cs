@@ -7,6 +7,23 @@ public abstract class BaseEvent
     public string CorrelationId { get; set; } = string.Empty;
 }
 
+public class CustomerCreatedEvent : BaseEvent
+{
+    public Guid CustomerId { get; set; }
+    public string NationalId { get; set; } = string.Empty;
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public DateTime Timestamp { get; set; }
+}
+
+public class CustomerDeletedEvent : BaseEvent
+{
+    public Guid CustomerId { get; set; }
+    public string NationalId { get; set; } = string.Empty;
+    public DateTime Timestamp { get; set; }
+}
+
 public class CustomerStatusChangedEvent : BaseEvent
 {
     public Guid CustomerId { get; set; }

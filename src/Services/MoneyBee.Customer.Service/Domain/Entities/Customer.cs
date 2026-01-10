@@ -1,47 +1,141 @@
 using System.ComponentModel.DataAnnotations;
+using MoneyBee.Common.DDD;
 using MoneyBee.Common.Enums;
+using MoneyBee.Customer.Service.Domain.Events;
 
 namespace MoneyBee.Customer.Service.Domain.Entities;
 
-public class Customer
+public class Customer : AggregateRoot
 {
     [Key]
-    public Guid Id { get; set; }
+    public Guid Id { get; private set; }
 
     [Required]
     [MaxLength(100)]
-    public string FirstName { get; set; } = string.Empty;
+    public string FirstName { get; private set; } = string.Empty;
 
     [Required]
     [MaxLength(100)]
-    public string LastName { get; set; } = string.Empty;
+    public string LastName { get; private set; } = string.Empty;
 
     [Required]
     [MaxLength(11)]
-    public string NationalId { get; set; } = string.Empty;
+    public string NationalId { get; private set; } = string.Empty;
 
     [Required]
     [MaxLength(20)]
-    public string PhoneNumber { get; set; } = string.Empty;
+    public string PhoneNumber { get; private set; } = string.Empty;
 
     [Required]
-    public DateTime DateOfBirth { get; set; }
+    public DateTime DateOfBirth { get; private set; }
 
     [Required]
-    public CustomerType CustomerType { get; set; }
+    public CustomerType CustomerType { get; private set; }
 
     [Required]
-    public CustomerStatus Status { get; set; } = CustomerStatus.Active;
+    public CustomerStatus Status { get; private set; } = CustomerStatus.Active;
 
-    public bool KycVerified { get; set; } = false;
+    public bool KycVerified { get; internal set; } = false;
 
-    public string? TaxNumber { get; set; }
+    public string? TaxNumber { get; private set; }
 
-    public string? Address { get; set; }
+    public string? Address { get; private set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
 
-    public DateTime? UpdatedAt { get; set; }
+    public DateTime? UpdatedAt { get; internal set; }
 
-    public string? Email { get; set; }
+    public string? Email { get; private set; }
+
+    // For EF Core
+    private Customer() { }
+
+    public static Customer Create(
+        string firstName,
+        string lastName,
+        string nationalId,
+        string phoneNumber,
+        DateTime dateOfBirth,
+        CustomerType customerType,
+        string? taxNumber,
+        string? address,
+        string? email)
+    {
+        var customer = new Customer
+        {
+            Id = Guid.NewGuid(),
+            FirstName = firstName,
+            LastName = lastName,
+            NationalId = nationalId,
+            PhoneNumber = phoneNumber,
+            DateOfBirth = dateOfBirth,
+            CustomerType = customerType,
+            TaxNumber = taxNumber,
+            Address = address,
+            Email = email,
+            Status = CustomerStatus.Active,
+            KycVerified = false,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        customer.AddDomainEvent(new CustomerCreatedDomainEvent(
+            customer.Id,
+            customer.NationalId,
+            customer.FirstName,
+            customer.LastName,
+            customer.Email ?? string.Empty));
+
+        return customer;
+    }
+
+    public void UpdateStatus(CustomerStatus newStatus)
+    {
+        if (Status == newStatus)
+            return;
+
+        var oldStatus = Status;
+        Status = newStatus;
+        UpdatedAt = DateTime.UtcNow;
+
+        AddDomainEvent(new CustomerStatusChangedDomainEvent(Id, oldStatus, newStatus));
+    }
+
+    public void UpdateInformation(
+        string firstName,
+        string lastName,
+        string phoneNumber,
+        string? address,
+        string? email)
+    {
+        FirstName = firstName;
+        LastName = lastName;
+        PhoneNumber = phoneNumber;
+        Address = address;
+        Email = email;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void VerifyKyc()
+    {
+        KycVerified = true;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void MarkForDeletion()
+    {
+        AddDomainEvent(new CustomerDeletedDomainEvent(Id, NationalId));
+    }
+
+    public bool IsAdult()
+    {
+        var age = DateTime.Today.Year - DateOfBirth.Year;
+        if (DateOfBirth.Date > DateTime.Today.AddYears(-age))
+            age--;
+        return age >= 18;
+    }
+
+    public bool CanPerformTransactions()
+    {
+        return Status == CustomerStatus.Active && IsAdult();
+    }
 }

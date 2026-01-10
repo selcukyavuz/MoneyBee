@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using MoneyBee.Common.DDD;
 using MoneyBee.Common.Enums;
 using CustomerEntity = MoneyBee.Customer.Service.Domain.Entities.Customer;
 using MoneyBee.Customer.Service.Domain.Interfaces;
@@ -40,6 +41,13 @@ public class CustomerRepository : ICustomerRepository
         var cutoffDate = DateTime.UtcNow.AddHours(-hours);
         return await _context.Customers
             .Where(c => !c.KycVerified && c.CreatedAt > cutoffDate)
+            .ToListAsync();
+    }
+
+    public async Task<IEnumerable<CustomerEntity>> FindAsync(ISpecification<CustomerEntity> specification)
+    {
+        return await _context.Customers
+            .Where(specification.ToExpression())
             .ToListAsync();
     }
 
