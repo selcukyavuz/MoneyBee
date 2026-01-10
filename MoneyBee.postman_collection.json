@@ -1,5 +1,6 @@
 {
   "info": {
+    "_postman_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
     "name": "MoneyBee API Collection",
     "description": "Complete API collection for MoneyBee Money Transfer System\n\n## Quick Start Guide\n1. Run `docker-compose up -d` to start all services\n2. Execute \"Auth Service → Create API Key\" to get your API key\n3. API key will be automatically saved to collection variable\n4. Run \"End-to-End Scenarios → Scenario 1: Happy Path\" to test complete flow\n\n## Features\n- ✅ All 3 microservices (Auth, Customer, Transfer)\n- ✅ Ready-to-use test scenarios\n- ✅ Auto-save API keys and IDs\n- ✅ Valid TC Kimlik No examples (10000000146, 11111111110)\n- ✅ Multi-currency transfers (TRY, USD, EUR, GBP)\n- ✅ Business rules testing (daily limit, high-value wait, fraud detection)\n\n## Important Notes\n- TC Kimlik No must pass checksum validation\n- Valid examples: 10000000146, 11111111110, 12345678958\n- High-value transfers (>1000 TRY) require 5-minute approval wait\n- Daily limit per customer: 10,000 TRY\n- Rate limit: 100 requests per minute per API key",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
@@ -62,8 +63,12 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl_auth}}/health",
-              "host": ["{{baseUrl_auth}}"],
-              "path": ["health"]
+              "host": [
+                "{{baseUrl_auth}}"
+              ],
+              "path": [
+                "health"
+              ]
             }
           }
         },
@@ -99,8 +104,14 @@
             },
             "url": {
               "raw": "{{baseUrl_auth}}/api/auth/keys",
-              "host": ["{{baseUrl_auth}}"],
-              "path": ["api", "auth", "keys"]
+              "host": [
+                "{{baseUrl_auth}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "keys"
+              ]
             }
           }
         },
@@ -111,8 +122,14 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl_auth}}/api/auth/keys",
-              "host": ["{{baseUrl_auth}}"],
-              "path": ["api", "auth", "keys"]
+              "host": [
+                "{{baseUrl_auth}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "keys"
+              ]
             }
           }
         },
@@ -123,8 +140,15 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl_auth}}/api/auth/keys/{{apiKeyId}}",
-              "host": ["{{baseUrl_auth}}"],
-              "path": ["api", "auth", "keys", "{{apiKeyId}}"],
+              "host": [
+                "{{baseUrl_auth}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "keys",
+                "{{apiKeyId}}"
+              ],
               "variable": [
                 {
                   "key": "apiKeyId",
@@ -150,8 +174,15 @@
             },
             "url": {
               "raw": "{{baseUrl_auth}}/api/auth/keys/{{apiKeyId}}",
-              "host": ["{{baseUrl_auth}}"],
-              "path": ["api", "auth", "keys", "{{apiKeyId}}"],
+              "host": [
+                "{{baseUrl_auth}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "keys",
+                "{{apiKeyId}}"
+              ],
               "variable": [
                 {
                   "key": "apiKeyId",
@@ -168,8 +199,15 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl_auth}}/api/auth/keys/{{apiKeyId}}",
-              "host": ["{{baseUrl_auth}}"],
-              "path": ["api", "auth", "keys", "{{apiKeyId}}"],
+              "host": [
+                "{{baseUrl_auth}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "keys",
+                "{{apiKeyId}}"
+              ],
               "variable": [
                 {
                   "key": "apiKeyId",
@@ -195,8 +233,15 @@
             },
             "url": {
               "raw": "{{baseUrl_auth}}/api/auth/keys/validate",
-              "host": ["{{baseUrl_auth}}"],
-              "path": ["api", "auth", "keys", "validate"]
+              "host": [
+                "{{baseUrl_auth}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "keys",
+                "validate"
+              ]
             }
           }
         }
@@ -212,8 +257,12 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl_customer}}/health",
-              "host": ["{{baseUrl_customer}}"],
-              "path": ["health"]
+              "host": [
+                "{{baseUrl_customer}}"
+              ],
+              "path": [
+                "health"
+              ]
             }
           }
         },
@@ -253,8 +302,13 @@
             },
             "url": {
               "raw": "{{baseUrl_customer}}/api/customers",
-              "host": ["{{baseUrl_customer}}"],
-              "path": ["api", "customers"]
+              "host": [
+                "{{baseUrl_customer}}"
+              ],
+              "path": [
+                "api",
+                "customers"
+              ]
             }
           }
         },
@@ -294,8 +348,13 @@
             },
             "url": {
               "raw": "{{baseUrl_customer}}/api/customers",
-              "host": ["{{baseUrl_customer}}"],
-              "path": ["api", "customers"]
+              "host": [
+                "{{baseUrl_customer}}"
+              ],
+              "path": [
+                "api",
+                "customers"
+              ]
             }
           }
         },
@@ -311,8 +370,13 @@
             ],
             "url": {
               "raw": "{{baseUrl_customer}}/api/customers?pageNumber=1&pageSize=10",
-              "host": ["{{baseUrl_customer}}"],
-              "path": ["api", "customers"],
+              "host": [
+                "{{baseUrl_customer}}"
+              ],
+              "path": [
+                "api",
+                "customers"
+              ],
               "query": [
                 {
                   "key": "pageNumber",
@@ -338,8 +402,14 @@
             ],
             "url": {
               "raw": "{{baseUrl_customer}}/api/customers/{{sender_id}}",
-              "host": ["{{baseUrl_customer}}"],
-              "path": ["api", "customers", "{{sender_id}}"]
+              "host": [
+                "{{baseUrl_customer}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                "{{sender_id}}"
+              ]
             }
           }
         },
@@ -363,8 +433,14 @@
             },
             "url": {
               "raw": "{{baseUrl_customer}}/api/customers/{{sender_id}}",
-              "host": ["{{baseUrl_customer}}"],
-              "path": ["api", "customers", "{{sender_id}}"]
+              "host": [
+                "{{baseUrl_customer}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                "{{sender_id}}"
+              ]
             }
           }
         },
@@ -388,8 +464,13 @@
             },
             "url": {
               "raw": "{{baseUrl_customer}}/api/customers",
-              "host": ["{{baseUrl_customer}}"],
-              "path": ["api", "customers"]
+              "host": [
+                "{{baseUrl_customer}}"
+              ],
+              "path": [
+                "api",
+                "customers"
+              ]
             }
           }
         },
@@ -405,8 +486,15 @@
             ],
             "url": {
               "raw": "{{baseUrl_customer}}/api/customers/verify/{{sender_nationalId}}",
-              "host": ["{{baseUrl_customer}}"],
-              "path": ["api", "customers", "verify", "{{sender_nationalId}}"]
+              "host": [
+                "{{baseUrl_customer}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                "verify",
+                "{{sender_nationalId}}"
+              ]
             }
           }
         },
@@ -430,8 +518,15 @@
             },
             "url": {
               "raw": "{{baseUrl_customer}}/api/customers/{{sender_id}}/status",
-              "host": ["{{baseUrl_customer}}"],
-              "path": ["api", "customers", "{{sender_id}}", "status"]
+              "host": [
+                "{{baseUrl_customer}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                "{{sender_id}}",
+                "status"
+              ]
             }
           }
         },
@@ -455,8 +550,15 @@
             },
             "url": {
               "raw": "{{baseUrl_customer}}/api/customers/{{sender_id}}/status",
-              "host": ["{{baseUrl_customer}}"],
-              "path": ["api", "customers", "{{sender_id}}", "status"]
+              "host": [
+                "{{baseUrl_customer}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                "{{sender_id}}",
+                "status"
+              ]
             },
             "description": "When a customer is blocked, all pending transfers are automatically cancelled"
           }
@@ -473,8 +575,12 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl_transfer}}/health",
-              "host": ["{{baseUrl_transfer}}"],
-              "path": ["health"]
+              "host": [
+                "{{baseUrl_transfer}}"
+              ],
+              "path": [
+                "health"
+              ]
             }
           }
         },
@@ -518,8 +624,13 @@
             },
             "url": {
               "raw": "{{baseUrl_transfer}}/api/transfers",
-              "host": ["{{baseUrl_transfer}}"],
-              "path": ["api", "transfers"]
+              "host": [
+                "{{baseUrl_transfer}}"
+              ],
+              "path": [
+                "api",
+                "transfers"
+              ]
             }
           }
         },
@@ -547,8 +658,13 @@
             },
             "url": {
               "raw": "{{baseUrl_transfer}}/api/transfers",
-              "host": ["{{baseUrl_transfer}}"],
-              "path": ["api", "transfers"]
+              "host": [
+                "{{baseUrl_transfer}}"
+              ],
+              "path": [
+                "api",
+                "transfers"
+              ]
             }
           }
         },
@@ -576,8 +692,13 @@
             },
             "url": {
               "raw": "{{baseUrl_transfer}}/api/transfers",
-              "host": ["{{baseUrl_transfer}}"],
-              "path": ["api", "transfers"]
+              "host": [
+                "{{baseUrl_transfer}}"
+              ],
+              "path": [
+                "api",
+                "transfers"
+              ]
             }
           }
         },
@@ -605,8 +726,13 @@
             },
             "url": {
               "raw": "{{baseUrl_transfer}}/api/transfers",
-              "host": ["{{baseUrl_transfer}}"],
-              "path": ["api", "transfers"]
+              "host": [
+                "{{baseUrl_transfer}}"
+              ],
+              "path": [
+                "api",
+                "transfers"
+              ]
             },
             "description": "EUR to TRY conversion using Exchange Rate Service"
           }
@@ -635,8 +761,13 @@
             },
             "url": {
               "raw": "{{baseUrl_transfer}}/api/transfers",
-              "host": ["{{baseUrl_transfer}}"],
-              "path": ["api", "transfers"]
+              "host": [
+                "{{baseUrl_transfer}}"
+              ],
+              "path": [
+                "api",
+                "transfers"
+              ]
             },
             "description": "GBP to TRY conversion using Exchange Rate Service"
           }
@@ -653,8 +784,14 @@
             ],
             "url": {
               "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}",
-              "host": ["{{baseUrl_transfer}}"],
-              "path": ["api", "transfers", "{{transactionCode}}"]
+              "host": [
+                "{{baseUrl_transfer}}"
+              ],
+              "path": [
+                "api",
+                "transfers",
+                "{{transactionCode}}"
+              ]
             }
           }
         },
@@ -670,8 +807,13 @@
             ],
             "url": {
               "raw": "{{baseUrl_transfer}}/api/transfers?pageNumber=1&pageSize=20",
-              "host": ["{{baseUrl_transfer}}"],
-              "path": ["api", "transfers"],
+              "host": [
+                "{{baseUrl_transfer}}"
+              ],
+              "path": [
+                "api",
+                "transfers"
+              ],
               "query": [
                 {
                   "key": "pageNumber",
@@ -703,8 +845,15 @@
             ],
             "url": {
               "raw": "{{baseUrl_transfer}}/api/transfers/customer/{{sender_id}}?pageNumber=1&pageSize=10",
-              "host": ["{{baseUrl_transfer}}"],
-              "path": ["api", "transfers", "customer", "{{sender_id}}"],
+              "host": [
+                "{{baseUrl_transfer}}"
+              ],
+              "path": [
+                "api",
+                "transfers",
+                "customer",
+                "{{sender_id}}"
+              ],
               "query": [
                 {
                   "key": "pageNumber",
@@ -738,8 +887,15 @@
             },
             "url": {
               "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}/complete",
-              "host": ["{{baseUrl_transfer}}"],
-              "path": ["api", "transfers", "{{transactionCode}}", "complete"]
+              "host": [
+                "{{baseUrl_transfer}}"
+              ],
+              "path": [
+                "api",
+                "transfers",
+                "{{transactionCode}}",
+                "complete"
+              ]
             }
           }
         },
@@ -763,8 +919,15 @@
             },
             "url": {
               "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}/cancel",
-              "host": ["{{baseUrl_transfer}}"],
-              "path": ["api", "transfers", "{{transactionCode}}", "cancel"]
+              "host": [
+                "{{baseUrl_transfer}}"
+              ],
+              "path": [
+                "api",
+                "transfers",
+                "{{transactionCode}}",
+                "cancel"
+              ]
             }
           }
         },
@@ -780,8 +943,15 @@
             ],
             "url": {
               "raw": "{{baseUrl_transfer}}/api/transfers/limit/{{sender_id}}",
-              "host": ["{{baseUrl_transfer}}"],
-              "path": ["api", "transfers", "limit", "{{sender_id}}"]
+              "host": [
+                "{{baseUrl_transfer}}"
+              ],
+              "path": [
+                "api",
+                "transfers",
+                "limit",
+                "{{sender_id}}"
+              ]
             }
           }
         },
@@ -797,8 +967,16 @@
             ],
             "url": {
               "raw": "{{baseUrl_transfer}}/api/transfers/customer/{{sender_nationalId}}/daily",
-              "host": ["{{baseUrl_transfer}}"],
-              "path": ["api", "transfers", "customer", "{{sender_nationalId}}", "daily"]
+              "host": [
+                "{{baseUrl_transfer}}"
+              ],
+              "path": [
+                "api",
+                "transfers",
+                "customer",
+                "{{sender_nationalId}}",
+                "daily"
+              ]
             },
             "description": "Get daily transfer summary: total amount, transfer count, remaining limit"
           }
@@ -827,8 +1005,14 @@
                 },
                 "url": {
                   "raw": "{{baseUrl_auth}}/api/auth/keys",
-                  "host": ["{{baseUrl_auth}}"],
-                  "path": ["api", "auth", "keys"]
+                  "host": [
+                    "{{baseUrl_auth}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "keys"
+                  ]
                 }
               }
             },
@@ -852,8 +1036,13 @@
                 },
                 "url": {
                   "raw": "{{baseUrl_customer}}/api/customers",
-                  "host": ["{{baseUrl_customer}}"],
-                  "path": ["api", "customers"]
+                  "host": [
+                    "{{baseUrl_customer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "customers"
+                  ]
                 }
               }
             },
@@ -877,8 +1066,13 @@
                 },
                 "url": {
                   "raw": "{{baseUrl_customer}}/api/customers",
-                  "host": ["{{baseUrl_customer}}"],
-                  "path": ["api", "customers"]
+                  "host": [
+                    "{{baseUrl_customer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "customers"
+                  ]
                 }
               }
             },
@@ -906,8 +1100,13 @@
                 },
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers"
+                  ]
                 }
               }
             },
@@ -931,8 +1130,15 @@
                 },
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}/complete",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers", "{{transactionCode}}", "complete"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers",
+                    "{{transactionCode}}",
+                    "complete"
+                  ]
                 }
               }
             }
@@ -980,8 +1186,13 @@
                 },
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers"
+                  ]
                 }
               }
             },
@@ -997,8 +1208,14 @@
                 ],
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers", "{{transactionCode}}"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers",
+                    "{{transactionCode}}"
+                  ]
                 }
               }
             },
@@ -1022,8 +1239,15 @@
                 },
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}/cancel",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers", "{{transactionCode}}", "cancel"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers",
+                    "{{transactionCode}}",
+                    "cancel"
+                  ]
                 },
                 "description": "Fee should be automatically refunded"
               }
@@ -1040,8 +1264,14 @@
                 ],
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers", "{{transactionCode}}"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers",
+                    "{{transactionCode}}"
+                  ]
                 },
                 "description": "Status should be CANCELLED"
               }
@@ -1092,8 +1322,13 @@
                 },
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers"
+                  ]
                 },
                 "description": "Exchange Rate Service will be called automatically"
               }
@@ -1122,8 +1357,13 @@
                 },
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers"
+                  ]
                 }
               }
             },
@@ -1151,8 +1391,13 @@
                 },
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers"
+                  ]
                 }
               }
             }
@@ -1173,8 +1418,16 @@
                 ],
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers/customer/{{sender_nationalId}}/daily",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers", "customer", "{{sender_nationalId}}", "daily"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers",
+                    "customer",
+                    "{{sender_nationalId}}",
+                    "daily"
+                  ]
                 },
                 "description": "Should show 10,000 TRY available"
               }
@@ -1203,8 +1456,13 @@
                 },
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers"
+                  ]
                 }
               }
             },
@@ -1232,8 +1490,13 @@
                 },
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers"
+                  ]
                 }
               }
             },
@@ -1261,8 +1524,13 @@
                 },
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers"
+                  ]
                 },
                 "description": "This should FAIL - total would be 10,500 TRY (exceeds 10,000 limit)"
               }
@@ -1279,8 +1547,16 @@
                 ],
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers/customer/{{sender_nationalId}}/daily",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers", "customer", "{{sender_nationalId}}", "daily"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers",
+                    "customer",
+                    "{{sender_nationalId}}",
+                    "daily"
+                  ]
                 },
                 "description": "Should show used: 6500 TRY, remaining: 3500 TRY"
               }
@@ -1330,8 +1606,13 @@
                 },
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers"
+                  ]
                 },
                 "description": "Amount > 1000 TRY requires 5-minute wait before completion"
               }
@@ -1356,8 +1637,15 @@
                 },
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}/complete",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers", "{{transactionCode}}", "complete"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers",
+                    "{{transactionCode}}",
+                    "complete"
+                  ]
                 },
                 "description": "Should FAIL - 5 minutes haven't passed yet"
               }
@@ -1382,8 +1670,15 @@
                 },
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}/complete",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers", "{{transactionCode}}", "complete"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers",
+                    "{{transactionCode}}",
+                    "complete"
+                  ]
                 },
                 "description": "Wait 5 minutes then run this - should succeed"
               }
@@ -1432,8 +1727,13 @@
                 },
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers"
+                  ]
                 }
               }
             },
@@ -1449,8 +1749,14 @@
                 ],
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers", "{{transactionCode}}"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers",
+                    "{{transactionCode}}"
+                  ]
                 },
                 "description": "Status should be PENDING"
               }
@@ -1475,8 +1781,15 @@
                 },
                 "url": {
                   "raw": "{{baseUrl_customer}}/api/customers/{{sender_id}}/status",
-                  "host": ["{{baseUrl_customer}}"],
-                  "path": ["api", "customers", "{{sender_id}}", "status"]
+                  "host": [
+                    "{{baseUrl_customer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "customers",
+                    "{{sender_id}}",
+                    "status"
+                  ]
                 },
                 "description": "RabbitMQ event will trigger auto-cancel of pending transfers"
               }
@@ -1493,8 +1806,14 @@
                 ],
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers", "{{transactionCode}}"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers",
+                    "{{transactionCode}}"
+                  ]
                 },
                 "description": "Status should be automatically changed to CANCELLED"
               }
@@ -1516,8 +1835,13 @@
                 ],
                 "url": {
                   "raw": "{{baseUrl_customer}}/api/customers?pageNumber=1&pageSize=10",
-                  "host": ["{{baseUrl_customer}}"],
-                  "path": ["api", "customers"],
+                  "host": [
+                    "{{baseUrl_customer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "customers"
+                  ],
                   "query": [
                     {
                       "key": "pageNumber",
@@ -1586,8 +1910,13 @@
                 },
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers"
+                  ]
                 }
               }
             },
@@ -1634,11 +1963,20 @@
                 },
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers",
-                  "host": ["{{baseUrl_transfer}}"],
-                  "path": ["api", "transfers"]
+                  "host": [
+                    "{{baseUrl_transfer}}"
+                  ],
+                  "path": [
+                    "api",
+                    "transfers"
+                  ]
                 },
                 "description": "Should return the SAME transfer as previous request (no duplicate)"
               }
             }
           ]
         }
+      ]
+    }
+  ]
+}
