@@ -6,7 +6,6 @@ using MoneyBee.Customer.Service.Application.DTOs;
 using MoneyBee.Customer.Service.Application.Interfaces;
 using MoneyBee.Customer.Service.Domain.Interfaces;
 using MoneyBee.Customer.Service.Domain.Services;
-using MoneyBee.Customer.Service.Infrastructure.Caching;
 using MoneyBee.Customer.Service.Infrastructure.ExternalServices;
 using MoneyBee.Customer.Service.Infrastructure.Messaging;
 using CustomerEntity = MoneyBee.Customer.Service.Domain.Entities.Customer;
@@ -20,22 +19,19 @@ public class CustomerService : ICustomerService
     private readonly IEventPublisher _eventPublisher;
     private readonly CustomerDomainService _domainService;
     private readonly ILogger<CustomerService> _logger;
-    private readonly ICustomerCacheService? _cacheService;
 
     public CustomerService(
         ICustomerRepository repository,
         IKycService kycService,
         IEventPublisher eventPublisher,
         CustomerDomainService domainService,
-        ILogger<CustomerService> logger,
-        ICustomerCacheService? cacheService = null)
+        ILogger<CustomerService> logger)
     {
         _repository = repository;
         _kycService = kycService;
         _eventPublisher = eventPublisher;
         _domainService = domainService;
         _logger = logger;
-        _cacheService = cacheService;
     }
 
     public async Task<CustomerDto> CreateCustomerAsync(CreateCustomerRequest request)
@@ -100,13 +96,6 @@ public class CustomerService : ICustomerService
         });
 
         var dto = MapToDto(customer);
-        
-        // Cache the customer
-        if (_cacheService != null)
-        {
-            await _cacheService.SetCustomerAsync(customer.Id, dto);
-            await _cacheService.SetCustomerByNationalIdAsync(nationalId.Value, dto);
-        }
 
         stopwatch.Stop();
         
@@ -129,26 +118,9 @@ public class CustomerService : ICustomerService
 
     public async Task<CustomerDto?> GetCustomerByIdAsync(Guid id)
     {
-        // Check cache first
-        if (_cacheService != null)
-        {
-            var cached = await _cacheService.GetCustomerAsync(id);
-            if (cached != null)
-            {
-                return cached;
-            }
-        }
-        
         var stopwatch = Stopwatch.StartNew();
         var customer = await _repository.GetByIdAsync(id);
         stopwatch.Stop();
-        
-        if (customer != null && _cacheService != null)
-        {
-            var dto = MapToDto(customer);
-            await _cacheService.SetCustomerAsync(id, dto);
-            return dto;
-        }
         
         return customer != null ? MapToDto(customer) : null;
     }
@@ -157,26 +129,9 @@ public class CustomerService : ICustomerService
     {
         var nationalIdVO = NationalId.Create(nationalId);
         
-        // Check cache first
-        if (_cacheService != null)
-        {
-            var cached = await _cacheService.GetCustomerByNationalIdAsync(nationalIdVO.Value);
-            if (cached != null)
-            {
-                return cached;
-            }
-        }
-        
         var stopwatch = Stopwatch.StartNew();
         var customer = await _repository.GetByNationalIdAsync(nationalIdVO.Value);
         stopwatch.Stop();
-        
-        if (customer != null && _cacheService != null)
-        {
-            var dto = MapToDto(customer);
-            await _cacheService.SetCustomerByNationalIdAsync(nationalIdVO.Value, dto);
-            return dto;
-        }
         
         return customer != null ? MapToDto(customer) : null;
     }
@@ -197,13 +152,6 @@ public class CustomerService : ICustomerService
             request.Email ?? customer.Email);
 
         await _repository.UpdateAsync(customer);
-        
-        // Invalidate cache
-        if (_cacheService != null)
-        {
-            await _cacheService.InvalidateCustomerAsync(id);
-            await _cacheService.InvalidateCustomerByNationalIdAsync(customer.NationalId);
-        }
 
         stopwatch.Stop();
 
@@ -229,13 +177,6 @@ public class CustomerService : ICustomerService
         customer.UpdateStatus(request.Status);
 
         await _repository.UpdateAsync(customer);
-        
-        // Invalidate cache
-        if (_cacheService != null)
-        {
-            await _cacheService.InvalidateCustomerAsync(id);
-            await _cacheService.InvalidateCustomerByNationalIdAsync(customer.NationalId);
-        }
 
         stopwatch.Stop();
         _logger.LogInformation("Customer status updated: {CustomerId} -> {NewStatus}. Reason: {Reason}", 
@@ -267,13 +208,6 @@ public class CustomerService : ICustomerService
 
         if (deleted)
         {
-            // Invalidate cache
-            if (_cacheService != null)
-            {
-                await _cacheService.InvalidateCustomerAsync(id);
-                await _cacheService.InvalidateCustomerByNationalIdAsync(customer.NationalId);
-            }
-            
             stopwatch.Stop();
             _logger.LogWarning("Customer deleted: {CustomerId}", id);
 

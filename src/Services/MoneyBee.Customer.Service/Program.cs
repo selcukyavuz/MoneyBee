@@ -2,14 +2,12 @@ using Microsoft.EntityFrameworkCore;
 using MoneyBee.Common.Services;
 using MoneyBee.Customer.Service.Application.Interfaces;
 using MoneyBee.Customer.Service.Domain.Interfaces;
-using MoneyBee.Customer.Service.Infrastructure.Caching;
 using MoneyBee.Customer.Service.Infrastructure.Data;
 using MoneyBee.Customer.Service.Infrastructure.ExternalServices;
 using MoneyBee.Customer.Service.Infrastructure.Messaging;
 using MoneyBee.Customer.Service.Infrastructure.Repositories;
 using MoneyBee.Customer.Service.BackgroundServices;
 using Serilog;
-using StackExchange.Redis;
 
 // PostgreSQL timestamp compatibility
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
@@ -50,19 +48,12 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddDbContext<CustomerDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Redis
-var redisConnectionString = builder.Configuration["Redis:ConnectionString"];
-builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnectionString!));
-
 // HTTP Clients
 builder.Services.AddHttpClient("KycService");
 
 // Clean Architecture - Dependency Injection
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<ICustomerService, MoneyBee.Customer.Service.Application.Services.CustomerService>();
-
-// Caching
-builder.Services.AddScoped<ICustomerCacheService, CustomerCacheService>();
 
 // DDD - Domain Services
 builder.Services.AddScoped<MoneyBee.Customer.Service.Domain.Services.CustomerDomainService>();
@@ -77,7 +68,6 @@ builder.Services.AddHostedService<KycRetryService>();
 // Health Checks
 builder.Services.AddHealthChecks()
     .AddNpgSql(builder.Configuration.GetConnectionString("DefaultConnection")!, name: "database")
-    .AddRedis(redisConnectionString!, "redis")
     .AddRabbitMQ(rabbitConnectionString: $"amqp://{builder.Configuration["RabbitMQ:Username"]}:{builder.Configuration["RabbitMQ:Password"]}@{builder.Configuration["RabbitMQ:Host"]}", name: "rabbitmq");
 
 var app = builder.Build();

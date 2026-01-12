@@ -4,14 +4,12 @@ using MoneyBee.Auth.Service.Application.Services;
 using MoneyBee.Auth.Service.Application.Validators;
 using MoneyBee.Auth.Service.Domain.Interfaces;
 using MoneyBee.Auth.Service.Infrastructure.Data;
-using MoneyBee.Auth.Service.Infrastructure.Caching;
 using MoneyBee.Auth.Service.Infrastructure.Repositories;
 using MoneyBee.Auth.Service.Middleware;
 using MoneyBee.Auth.Service.Services;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Serilog;
-using StackExchange.Redis;
 
 // PostgreSQL timestamp compatibility
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
@@ -66,17 +64,10 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddDbContext<AuthDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Redis
-var redisConnectionString = builder.Configuration["Redis:ConnectionString"];
-builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnectionString!));
-
 // Clean Architecture - Dependency Injection
 builder.Services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
 builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
 builder.Services.AddScoped<IRateLimitService, RateLimitService>();
-
-// Redis Caching
-builder.Services.AddScoped<IApiKeyCacheService, ApiKeyCacheService>();
 
 // FluentValidation
 builder.Services.AddFluentValidationAutoValidation();
@@ -84,8 +75,7 @@ builder.Services.AddValidatorsFromAssemblyContaining<CreateApiKeyValidator>();
 
 // Health Checks
 builder.Services.AddHealthChecks()
-    .AddNpgSql(builder.Configuration.GetConnectionString("DefaultConnection")!, name: "database")
-    .AddRedis(redisConnectionString!, "redis");
+    .AddNpgSql(builder.Configuration.GetConnectionString("DefaultConnection")!, name: "database");
 
 var app = builder.Build();
 

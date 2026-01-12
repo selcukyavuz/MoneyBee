@@ -4,7 +4,6 @@ using MoneyBee.Transfer.Service.Infrastructure.Data;
 using MoneyBee.Transfer.Service.Infrastructure.ExternalServices;
 using MoneyBee.Transfer.Service.Infrastructure.Messaging;
 using Serilog;
-using StackExchange.Redis;
 
 // PostgreSQL timestamp compatibility
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
@@ -45,10 +44,6 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddDbContext<TransferDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Redis
-var redisConnectionString = builder.Configuration["Redis:ConnectionString"];
-builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnectionString!));
-
 // HTTP Clients
 builder.Services.AddHttpClient("FraudService");
 builder.Services.AddHttpClient("ExchangeRateService");
@@ -74,7 +69,7 @@ builder.Services.AddHostedService<CustomerEventConsumer>();
 // Health Checks
 builder.Services.AddHealthChecks()
     .AddNpgSql(builder.Configuration.GetConnectionString("DefaultConnection")!, name: "database")
-    .AddRedis(redisConnectionString!, "redis");
+    .AddRabbitMQ(name: "rabbitmq");
 
 var app = builder.Build();
 
