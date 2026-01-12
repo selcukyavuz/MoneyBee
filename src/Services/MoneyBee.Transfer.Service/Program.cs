@@ -4,6 +4,7 @@ using MoneyBee.Transfer.Service.Infrastructure.Data;
 using MoneyBee.Transfer.Service.Infrastructure.ExternalServices;
 using MoneyBee.Transfer.Service.Infrastructure.Messaging;
 using Serilog;
+using StackExchange.Redis;
 
 // PostgreSQL timestamp compatibility
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
@@ -58,6 +59,13 @@ builder.Services.AddScoped<MoneyBee.Transfer.Service.Application.Interfaces.ITra
 
 // DDD - Domain Services
 builder.Services.AddScoped<MoneyBee.Transfer.Service.Domain.Services.TransferDomainService>();
+
+// Redis
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+{
+    var configuration = ConfigurationOptions.Parse(builder.Configuration.GetConnectionString("Redis")!);
+    return ConnectionMultiplexer.Connect(configuration);
+});
 
 // Infrastructure Services
 builder.Services.AddSingleton<IDistributedLockService, RedisDistributedLockService>();

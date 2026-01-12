@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using MoneyBee.Common.DDD;
 using MoneyBee.Common.Enums;
 using CustomerEntity = MoneyBee.Customer.Service.Domain.Entities.Customer;
 using MoneyBee.Customer.Service.Domain.Interfaces;

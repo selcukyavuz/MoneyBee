@@ -1,9 +1,7 @@
-using Microsoft.EntityFrameworkCore;
 using MoneyBee.Common.Enums;
 using MoneyBee.Common.Events;
 using MoneyBee.Common.Exceptions;
 using MoneyBee.Common.Services;
-using MoneyBee.Common.ValueObjects;
 using MoneyBee.Transfer.Service.Application.DTOs;
 using MoneyBee.Transfer.Service.Application.Interfaces;
 using TransferEntity = MoneyBee.Transfer.Service.Domain.Entities.Transfer;
@@ -115,20 +113,20 @@ public class TransferService : ITransferService
         }
 
         // Check daily limit with distributed lock to prevent race conditions
-        var lockKey = $"customer:{sender.Id}:daily-limit";
         await _distributedLock.ExecuteWithLockAsync(
-            lockKey,
-            TimeSpan.FromSeconds(10),
+            lockKey: $"customer:{sender.Id}:daily-limit",
+            expiry: TimeSpan.FromSeconds(10),
             async () =>
             {
                 var dailyTotal = await _repository.GetDailyTotalAsync(sender.Id, DateTime.Today);
                 _domainService.ValidateDailyLimit(dailyTotal, amountInTRY, DAILY_LIMIT_TRY);
+                
+                _logger.LogDebug(
+                    "Daily limit check passed for customer {CustomerId}: {DailyTotal} + {Amount} <= {Limit}",
+                    sender.Id, dailyTotal, amountInTRY, DAILY_LIMIT_TRY);
+                
                 return true;
             });
-
-        _logger.LogDebug(
-            "Daily limit check passed with lock for customer {CustomerId}: {DailyTotal} + {Amount} <= {Limit}",
-            sender.Id, await _repository.GetDailyTotalAsync(sender.Id, DateTime.Today), amountInTRY, DAILY_LIMIT_TRY);
 
         // Perform fraud check
         var fraudCheck = await _fraudService.CheckTransferAsync(
@@ -199,115 +197,59 @@ public class TransferService : ITransferService
 
     public async Task<TransferDto> CompleteTransferAsync(string transactionCode, CompleteTransferRequest request)
     {
-        const int maxRetries = 3;
-        
-        for (int attempt = 0; attempt < maxRetries; attempt++)
+        var transfer = await _repository.GetByTransactionCodeAsync(transactionCode);
+
+        if (transfer == null)
         {
-            try
-            {
-                var transfer = await _repository.GetByTransactionCodeAsync(transactionCode);
-
-                if (transfer == null)
-                {
-                    throw new ArgumentException("Transfer not found");
-                }
-
-                // Use domain service for validation
-                _domainService.ValidateTransferForCompletion(transfer, request.ReceiverNationalId);
-
-                // Use aggregate method to complete
-                transfer.Complete();
-
-                await _repository.UpdateAsync(transfer);
-
-                // Publish integration event directly to RabbitMQ
-                await _eventPublisher.PublishAsync(new TransferCompletedEvent
-                {
-                    TransferId = transfer.Id,
-                    TransactionCode = transfer.TransactionCode
-                });
-
-                _logger.LogInformation("Transfer completed: {TransferId} - Code: {TransactionCode}",
-                    transfer.Id, transfer.TransactionCode);
-
-                return MapToDto(transfer);
-            }
-            catch (DbUpdateConcurrencyException ex)
-            {
-                if (attempt == maxRetries - 1)
-                {
-                    _logger.LogError(ex, 
-                        "Concurrent update detected for transfer {TransactionCode} after {Attempts} attempts",
-                        transactionCode, maxRetries);
-                    throw new InvalidOperationException(
-                        "Transfer was modified by another user. Please refresh and try again.", ex);
-                }
-                
-                _logger.LogWarning(
-                    "Concurrent update detected for transfer {TransactionCode}. Retry attempt {Attempt}/{MaxRetries}",
-                    transactionCode, attempt + 1, maxRetries);
-                
-                // Exponential backoff
-                await Task.Delay(TimeSpan.FromMilliseconds(100 * (attempt + 1)));
-            }
+            throw new ArgumentException("Transfer not found");
         }
-        
-        throw new InvalidOperationException("Failed to complete transfer after maximum retries.");
+
+        // Use domain service for validation
+        _domainService.ValidateTransferForCompletion(transfer, request.ReceiverNationalId);
+
+        // Use aggregate method to complete
+        transfer.Complete();
+
+        await _repository.UpdateAsync(transfer);
+
+        // Publish integration event directly to RabbitMQ
+        await _eventPublisher.PublishAsync(new TransferCompletedEvent
+        {
+            TransferId = transfer.Id,
+            TransactionCode = transfer.TransactionCode
+        });
+
+        _logger.LogInformation("Transfer completed: {TransferId} - Code: {TransactionCode}",
+            transfer.Id, transfer.TransactionCode);
+
+        return MapToDto(transfer);
     }
 
     public async Task<TransferDto> CancelTransferAsync(string transactionCode, CancelTransferRequest request)
     {
-        const int maxRetries = 3;
-        
-        for (int attempt = 0; attempt < maxRetries; attempt++)
+        var transfer = await _repository.GetByTransactionCodeAsync(transactionCode);
+
+        if (transfer == null)
         {
-            try
-            {
-                var transfer = await _repository.GetByTransactionCodeAsync(transactionCode);
-
-                if (transfer == null)
-                {
-                    throw new ArgumentException("Transfer not found");
-                }
-
-                // Use aggregate method to cancel
-                transfer.Cancel(request.Reason);
-
-                await _repository.UpdateAsync(transfer);
-
-                // Publish integration event directly to RabbitMQ
-                await _eventPublisher.PublishAsync(new TransferCancelledEvent
-                {
-                    TransferId = transfer.Id,
-                    Reason = request.Reason ?? string.Empty
-                });
-
-                _logger.LogInformation("Transfer cancelled: {TransferId} - Reason: {Reason}",
-                    transfer.Id, request.Reason);
-
-                return MapToDto(transfer);
-            }
-            catch (DbUpdateConcurrencyException ex)
-            {
-                if (attempt == maxRetries - 1)
-                {
-                    _logger.LogError(ex,
-                        "Concurrent update detected for transfer {TransactionCode} after {Attempts} attempts",
-                        transactionCode, maxRetries);
-                    throw new InvalidOperationException(
-                        "Transfer was modified by another user. Please refresh and try again.", ex);
-                }
-                
-                _logger.LogWarning(
-                    "Concurrent update detected for transfer {TransactionCode}. Retry attempt {Attempt}/{MaxRetries}",
-                    transactionCode, attempt + 1, maxRetries);
-                
-                // Exponential backoff
-                await Task.Delay(TimeSpan.FromMilliseconds(100 * (attempt + 1)));
-            }
+            throw new ArgumentException("Transfer not found");
         }
-        
-        throw new InvalidOperationException("Failed to cancel transfer after maximum retries.");
+
+        // Use aggregate method to cancel
+        transfer.Cancel(request.Reason);
+
+        await _repository.UpdateAsync(transfer);
+
+        // Publish integration event directly to RabbitMQ
+        await _eventPublisher.PublishAsync(new TransferCancelledEvent
+        {
+            TransferId = transfer.Id,
+            Reason = request.Reason ?? string.Empty
+        });
+
+        _logger.LogInformation("Transfer cancelled: {TransferId} - Reason: {Reason}",
+            transfer.Id, request.Reason);
+
+        return MapToDto(transfer);
     }
 
     public async Task<TransferDto?> GetTransferByCodeAsync(string transactionCode)

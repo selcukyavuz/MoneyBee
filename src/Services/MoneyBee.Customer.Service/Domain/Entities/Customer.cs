@@ -1,10 +1,9 @@
 using System.ComponentModel.DataAnnotations;
-using MoneyBee.Common.DDD;
 using MoneyBee.Common.Enums;
 
 namespace MoneyBee.Customer.Service.Domain.Entities;
 
-public class Customer : AggregateRoot
+public class Customer
 {
     [Key]
     public Guid Id { get; private set; }

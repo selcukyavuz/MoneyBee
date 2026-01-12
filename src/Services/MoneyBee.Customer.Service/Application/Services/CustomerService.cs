@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using MoneyBee.Common.Enums;
 using MoneyBee.Common.Events;
-using MoneyBee.Common.ValueObjects;
 using MoneyBee.Customer.Service.Application.DTOs;
 using MoneyBee.Customer.Service.Application.Interfaces;
 using MoneyBee.Customer.Service.Domain.Interfaces;
@@ -38,11 +37,8 @@ public class CustomerService : ICustomerService
     {
         var stopwatch = Stopwatch.StartNew();
         
-        // Validate National ID using Value Object
-        var nationalId = NationalId.Create(request.NationalId);
-
         // Check if customer already exists
-        var existingCustomer = await _repository.GetByNationalIdAsync(nationalId.Value);
+        var existingCustomer = await _repository.GetByNationalIdAsync(request.NationalId);
         if (existingCustomer != null)
         {
             throw new InvalidOperationException("Customer with this National ID already exists");
@@ -52,7 +48,7 @@ public class CustomerService : ICustomerService
         var customer = CustomerEntity.Create(
             request.FirstName,
             request.LastName,
-            nationalId.Value,
+            request.NationalId,
             request.PhoneNumber,
             DateTime.SpecifyKind(request.DateOfBirth, DateTimeKind.Utc),
             request.CustomerType,
@@ -66,7 +62,7 @@ public class CustomerService : ICustomerService
         // Perform KYC verification (non-blocking)
         var kycStopwatch = Stopwatch.StartNew();
         var kycResult = await _kycService.VerifyCustomerAsync(
-            nationalId.Value,
+            request.NationalId,
             request.FirstName,
             request.LastName,
             request.DateOfBirth);
@@ -79,7 +75,7 @@ public class CustomerService : ICustomerService
         else
         {
             _logger.LogWarning("KYC verification failed for {NationalId}: {Message}. Customer will be created with unverified status.",
-                nationalId.Value, kycResult.Message);
+                customer.NationalId, kycResult.Message);
         }
 
         await _repository.CreateAsync(customer);
@@ -103,7 +99,7 @@ public class CustomerService : ICustomerService
             ? "Customer created with verified KYC" 
             : "Customer created with unverified KYC - verification will be retried";
         
-        _logger.LogInformation("{LogMessage}: {CustomerId} - {NationalId}", logMessage, customer.Id, nationalId.Value);
+        _logger.LogInformation("{LogMessage}: {CustomerId} - {NationalId}", logMessage, customer.Id, customer.NationalId);
 
         return dto;
     }
@@ -127,10 +123,8 @@ public class CustomerService : ICustomerService
 
     public async Task<CustomerDto?> GetCustomerByNationalIdAsync(string nationalId)
     {
-        var nationalIdVO = NationalId.Create(nationalId);
-        
         var stopwatch = Stopwatch.StartNew();
-        var customer = await _repository.GetByNationalIdAsync(nationalIdVO.Value);
+        var customer = await _repository.GetByNationalIdAsync(nationalId);
         stopwatch.Stop();
         
         return customer != null ? MapToDto(customer) : null;
@@ -225,13 +219,9 @@ public class CustomerService : ICustomerService
 
     public async Task<CustomerVerificationResponse> VerifyCustomerAsync(string nationalId)
     {
-        // Use Value Object for validation
         try
         {
-            var nationalIdVO = NationalId.Create(nationalId);
-            var normalized = nationalIdVO.Value;
-
-            var customer = await _repository.GetByNationalIdAsync(normalized);
+            var customer = await _repository.GetByNationalIdAsync(nationalId);
 
             if (customer == null)
             {

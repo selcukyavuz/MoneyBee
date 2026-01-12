@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using MoneyBee.Common.DDD;
 using MoneyBee.Common.Enums;
 using TransferEntity = MoneyBee.Transfer.Service.Domain.Entities.Transfer;
 using MoneyBee.Transfer.Service.Domain.Interfaces;

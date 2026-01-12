@@ -4,7 +4,8 @@ using StackExchange.Redis;
 namespace MoneyBee.Common.Services;
 
 /// <summary>
-/// Redis-based distributed lock implementation using SETNX
+/// Redis-based distributed lock implementation for preventing race conditions.
+/// Uses Redis SET NX EX for atomic lock acquisition with automatic expiration.
 /// </summary>
 public class RedisDistributedLockService : IDistributedLockService
 {
@@ -19,96 +20,58 @@ public class RedisDistributedLockService : IDistributedLockService
         _logger = logger;
     }
 
-    public async Task<bool> AcquireLockAsync(string key, TimeSpan expiry, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var db = _redis.GetDatabase();
-            var lockKey = $"lock:{key}";
-            var lockValue = Guid.NewGuid().ToString(); // Unique value for this lock instance
-
-            // Use SETNX (SET if Not eXists) with expiration
-            var acquired = await db.StringSetAsync(lockKey, lockValue, expiry, When.NotExists);
-
-            if (acquired)
-            {
-                _logger.LogDebug("Distributed lock acquired: {LockKey}", lockKey);
-            }
-            else
-            {
-                _logger.LogDebug("Failed to acquire distributed lock: {LockKey}", lockKey);
-            }
-
-            return acquired;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error acquiring distributed lock: {LockKey}", key);
-            throw;
-        }
-    }
-
-    public async Task ReleaseLockAsync(string key, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var db = _redis.GetDatabase();
-            var lockKey = $"lock:{key}";
-            
-            await db.KeyDeleteAsync(lockKey);
-            
-            _logger.LogDebug("Distributed lock released: {LockKey}", lockKey);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error releasing distributed lock: {LockKey}", key);
-            throw;
-        }
-    }
-
     public async Task<T> ExecuteWithLockAsync<T>(
-        string key, 
-        TimeSpan expiry, 
-        Func<Task<T>> action, 
-        CancellationToken cancellationToken = default)
+        string lockKey,
+        TimeSpan expiry,
+        Func<Task<T>> action)
     {
-        var lockKey = $"lock:{key}";
-        
-        // Try to acquire lock with retry
-        const int maxRetries = 3;
-        bool lockAcquired = false;
-        
-        for (int i = 0; i < maxRetries; i++)
-        {
-            lockAcquired = await AcquireLockAsync(key, expiry, cancellationToken);
-            
-            if (lockAcquired)
-                break;
-                
-            if (i < maxRetries - 1)
-            {
-                _logger.LogDebug("Lock acquisition retry {Attempt}/{MaxRetries} for {LockKey}", 
-                    i + 1, maxRetries, lockKey);
-                await Task.Delay(TimeSpan.FromMilliseconds(100 * (i + 1)), cancellationToken);
-            }
-        }
-
-        if (!lockAcquired)
-        {
-            _logger.LogWarning("Failed to acquire lock after {MaxRetries} retries: {LockKey}", 
-                maxRetries, lockKey);
-            throw new InvalidOperationException(
-                $"Could not acquire distributed lock for {key}. Please try again.");
-        }
+        var db = _redis.GetDatabase();
+        var lockValue = Guid.NewGuid().ToString(); // Unique lock value to prevent accidental unlock
+        var lockAcquired = false;
 
         try
         {
-            _logger.LogDebug("Executing action with lock: {LockKey}", lockKey);
+            // Try to acquire lock (SET NX EX)
+            // Returns true only if key doesn't exist
+            lockAcquired = await db.StringSetAsync(
+                lockKey,
+                lockValue,
+                expiry,
+                When.NotExists);
+
+            if (!lockAcquired)
+            {
+                _logger.LogWarning(
+                    "Failed to acquire distributed lock: {LockKey}. Another process holds the lock.",
+                    lockKey);
+                throw new TimeoutException($"Could not acquire lock: {lockKey}");
+            }
+
+            _logger.LogDebug("Acquired distributed lock: {LockKey}", lockKey);
+
+            // Execute the action while holding the lock
             return await action();
         }
         finally
         {
-            await ReleaseLockAsync(key, cancellationToken);
+            if (lockAcquired)
+            {
+                // Release lock only if we acquired it and the value matches
+                // This prevents releasing a lock acquired by another process after expiry
+                var script = @"
+                    if redis.call('get', KEYS[1]) == ARGV[1] then
+                        return redis.call('del', KEYS[1])
+                    else
+                        return 0
+                    end";
+
+                await db.ScriptEvaluateAsync(
+                    script,
+                    new RedisKey[] { lockKey },
+                    new RedisValue[] { lockValue });
+
+                _logger.LogDebug("Released distributed lock: {LockKey}", lockKey);
+            }
         }
     }
 }

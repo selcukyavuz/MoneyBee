@@ -1,10 +1,9 @@
 using System.ComponentModel.DataAnnotations;
-using MoneyBee.Common.DDD;
 using MoneyBee.Common.Enums;
 
 namespace MoneyBee.Transfer.Service.Domain.Entities;
 
-public class Transfer : AggregateRoot
+public class Transfer
 {
     [Key]
     public Guid Id { get; private set; }
