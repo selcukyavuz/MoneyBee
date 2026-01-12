@@ -6,14 +6,10 @@ using MoneyBee.Auth.Service.Domain.Interfaces;
 using MoneyBee.Auth.Service.Infrastructure.Data;
 using MoneyBee.Auth.Service.Infrastructure.Caching;
 using MoneyBee.Auth.Service.Infrastructure.Repositories;
-using MoneyBee.Auth.Service.Infrastructure.Metrics;
 using MoneyBee.Auth.Service.Middleware;
 using MoneyBee.Auth.Service.Services;
 using FluentValidation;
 using FluentValidation.AspNetCore;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 using Serilog;
 using StackExchange.Redis;
 
@@ -82,41 +78,6 @@ builder.Services.AddScoped<IRateLimitService, RateLimitService>();
 // Redis Caching
 builder.Services.AddScoped<IApiKeyCacheService, ApiKeyCacheService>();
 
-// Metrics
-builder.Services.AddSingleton<AuthMetrics>();
-
-// OpenTelemetry Metrics & Tracing
-builder.Services.AddOpenTelemetry()
-    .ConfigureResource(resource => resource
-        .AddService(
-            serviceName: "MoneyBee.Auth.Service",
-            serviceVersion: "1.0.0",
-            serviceInstanceId: Environment.MachineName))
-    .WithMetrics(metrics => metrics
-        .AddMeter("MoneyBee.Auth.Service")
-        .AddAspNetCoreInstrumentation()
-        .AddHttpClientInstrumentation()
-        .AddPrometheusExporter())
-    .WithTracing(tracing => tracing
-        .AddAspNetCoreInstrumentation(options =>
-        {
-            options.RecordException = true;
-            options.EnrichWithHttpRequest = (activity, request) =>
-            {
-                activity.SetTag("http.client_ip", request.HttpContext.Connection.RemoteIpAddress?.ToString());
-            };
-        })
-        .AddHttpClientInstrumentation()
-        .AddEntityFrameworkCoreInstrumentation(options =>
-        {
-            options.SetDbStatementForText = true;
-            options.SetDbStatementForStoredProcedure = true;
-        })
-        .AddOtlpExporter(options =>
-        {
-            options.Endpoint = new Uri(builder.Configuration["Jaeger:Endpoint"] ?? "http://localhost:4317");
-        }));
-
 // FluentValidation
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateApiKeyValidator>();
@@ -152,8 +113,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseSerilogRequestLogging();
 
-// OpenTelemetry Prometheus metrics endpoint (before authentication middleware)
-app.MapPrometheusScrapingEndpoint();
 
 // Custom Middleware
 app.UseMiddleware<ApiKeyAuthenticationMiddleware>();

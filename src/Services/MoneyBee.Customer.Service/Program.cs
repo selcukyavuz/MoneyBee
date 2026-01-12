@@ -6,12 +6,8 @@ using MoneyBee.Customer.Service.Infrastructure.Caching;
 using MoneyBee.Customer.Service.Infrastructure.Data;
 using MoneyBee.Customer.Service.Infrastructure.ExternalServices;
 using MoneyBee.Customer.Service.Infrastructure.Messaging;
-using MoneyBee.Customer.Service.Infrastructure.Metrics;
 using MoneyBee.Customer.Service.Infrastructure.Repositories;
 using MoneyBee.Customer.Service.BackgroundServices;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 using Serilog;
 using StackExchange.Redis;
 
@@ -68,44 +64,6 @@ builder.Services.AddScoped<ICustomerService, MoneyBee.Customer.Service.Applicati
 // Caching
 builder.Services.AddScoped<ICustomerCacheService, CustomerCacheService>();
 
-// Metrics
-builder.Services.AddSingleton<CustomerMetrics>();
-
-// OpenTelemetry Metrics & Tracing
-builder.Services.AddOpenTelemetry()
-    .ConfigureResource(resource => resource
-        .AddService(
-            serviceName: "MoneyBee.Customer.Service",
-            serviceVersion: "1.0.0",
-            serviceInstanceId: Environment.MachineName))
-    .WithMetrics(metrics => metrics
-        .AddMeter("MoneyBee.Customer.Service")
-        .AddAspNetCoreInstrumentation()
-        .AddHttpClientInstrumentation()
-        .AddPrometheusExporter())
-    .WithTracing(tracing => tracing
-        .AddAspNetCoreInstrumentation(options =>
-        {
-            options.RecordException = true;
-            options.EnrichWithHttpRequest = (activity, request) =>
-            {
-                activity.SetTag("http.client_ip", request.HttpContext.Connection.RemoteIpAddress?.ToString());
-            };
-        })
-        .AddHttpClientInstrumentation(options =>
-        {
-            options.RecordException = true;
-        })
-        .AddEntityFrameworkCoreInstrumentation(options =>
-        {
-            options.SetDbStatementForText = true;
-            options.SetDbStatementForStoredProcedure = true;
-        })
-        .AddOtlpExporter(options =>
-        {
-            options.Endpoint = new Uri(builder.Configuration["Jaeger:Endpoint"] ?? "http://localhost:4317");
-        }));
-
 // DDD - Domain Services
 builder.Services.AddScoped<MoneyBee.Customer.Service.Domain.Services.CustomerDomainService>();
 
@@ -148,8 +106,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseSerilogRequestLogging();
 
-// OpenTelemetry Prometheus metrics endpoint
-app.MapPrometheusScrapingEndpoint();
 
 app.MapControllers();
 

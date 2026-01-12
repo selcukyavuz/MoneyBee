@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
 using MoneyBee.Auth.Service.Application.Interfaces;
-using MoneyBee.Auth.Service.Infrastructure.Metrics;
 using StackExchange.Redis;
 
 namespace MoneyBee.Auth.Service.Infrastructure.Caching;
@@ -10,18 +9,15 @@ public class ApiKeyCacheService : IApiKeyCacheService
 {
     private readonly IConnectionMultiplexer _redis;
     private readonly ILogger<ApiKeyCacheService> _logger;
-    private readonly AuthMetrics? _metrics;
     private const string CacheKeyPrefix = "apikey:validation:";
     private const string AllKeysPattern = "apikey:validation:*";
 
     public ApiKeyCacheService(
         IConnectionMultiplexer redis,
-        ILogger<ApiKeyCacheService> logger,
-        AuthMetrics? metrics = null)
+        ILogger<ApiKeyCacheService> logger)
     {
         _redis = redis;
         _logger = logger;
-        _metrics = metrics;
     }
 
     public async Task<bool?> GetValidationResultAsync(string keyHash)
@@ -34,16 +30,13 @@ public class ApiKeyCacheService : IApiKeyCacheService
             var cachedValue = await db.StringGetAsync(cacheKey);
 
             stopwatch.Stop();
-            _metrics?.RecordCacheOperation("get", stopwatch.Elapsed.TotalMilliseconds);
 
             if (cachedValue.HasValue)
             {
-                _metrics?.RecordCacheHit();
                 _logger.LogDebug("Cache HIT for key hash: {KeyHash}", MaskKeyHash(keyHash));
                 return bool.Parse(cachedValue!);
             }
 
-            _metrics?.RecordCacheMiss();
             _logger.LogDebug("Cache MISS for key hash: {KeyHash}", MaskKeyHash(keyHash));
             return null;
         }

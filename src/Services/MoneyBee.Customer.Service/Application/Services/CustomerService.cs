@@ -9,7 +9,6 @@ using MoneyBee.Customer.Service.Domain.Services;
 using MoneyBee.Customer.Service.Infrastructure.Caching;
 using MoneyBee.Customer.Service.Infrastructure.ExternalServices;
 using MoneyBee.Customer.Service.Infrastructure.Messaging;
-using MoneyBee.Customer.Service.Infrastructure.Metrics;
 using CustomerEntity = MoneyBee.Customer.Service.Domain.Entities.Customer;
 
 namespace MoneyBee.Customer.Service.Application.Services;
@@ -22,7 +21,6 @@ public class CustomerService : ICustomerService
     private readonly CustomerDomainService _domainService;
     private readonly ILogger<CustomerService> _logger;
     private readonly ICustomerCacheService? _cacheService;
-    private readonly CustomerMetrics? _metrics;
 
     public CustomerService(
         ICustomerRepository repository,
@@ -30,8 +28,7 @@ public class CustomerService : ICustomerService
         IEventPublisher eventPublisher,
         CustomerDomainService domainService,
         ILogger<CustomerService> logger,
-        ICustomerCacheService? cacheService = null,
-        CustomerMetrics? metrics = null)
+        ICustomerCacheService? cacheService = null)
     {
         _repository = repository;
         _kycService = kycService;
@@ -39,7 +36,6 @@ public class CustomerService : ICustomerService
         _domainService = domainService;
         _logger = logger;
         _cacheService = cacheService;
-        _metrics = metrics;
     }
 
     public async Task<CustomerDto> CreateCustomerAsync(CreateCustomerRequest request)
@@ -79,7 +75,6 @@ public class CustomerService : ICustomerService
             request.LastName,
             request.DateOfBirth);
         kycStopwatch.Stop();
-        _metrics?.RecordKycVerification(kycResult.IsVerified, kycStopwatch.Elapsed.TotalMilliseconds);
 
         if (kycResult.IsVerified)
         {
@@ -114,8 +109,6 @@ public class CustomerService : ICustomerService
         }
 
         stopwatch.Stop();
-        _metrics?.RecordCustomerCreated();
-        _metrics?.RecordCustomerOperation("create", stopwatch.Elapsed.TotalMilliseconds);
         
         var logMessage = kycResult.IsVerified 
             ? "Customer created with verified KYC" 
@@ -131,7 +124,6 @@ public class CustomerService : ICustomerService
         var stopwatch = Stopwatch.StartNew();
         var customers = await _repository.GetAllAsync(pageNumber, pageSize);
         stopwatch.Stop();
-        _metrics?.RecordCustomerOperation("getAll", stopwatch.Elapsed.TotalMilliseconds);
         return customers.Select(MapToDto);
     }
 
@@ -150,7 +142,6 @@ public class CustomerService : ICustomerService
         var stopwatch = Stopwatch.StartNew();
         var customer = await _repository.GetByIdAsync(id);
         stopwatch.Stop();
-        _metrics?.RecordCustomerOperation("getById", stopwatch.Elapsed.TotalMilliseconds);
         
         if (customer != null && _cacheService != null)
         {
@@ -179,7 +170,6 @@ public class CustomerService : ICustomerService
         var stopwatch = Stopwatch.StartNew();
         var customer = await _repository.GetByNationalIdAsync(nationalIdVO.Value);
         stopwatch.Stop();
-        _metrics?.RecordCustomerOperation("getByNationalId", stopwatch.Elapsed.TotalMilliseconds);
         
         if (customer != null && _cacheService != null)
         {
@@ -216,8 +206,7 @@ public class CustomerService : ICustomerService
         }
 
         stopwatch.Stop();
-        _metrics?.RecordCustomerUpdated();
-        _metrics?.RecordCustomerOperation("update", stopwatch.Elapsed.TotalMilliseconds);
+
         _logger.LogInformation("Customer updated: {CustomerId}", id);
 
         return MapToDto(customer);
@@ -249,7 +238,6 @@ public class CustomerService : ICustomerService
         }
 
         stopwatch.Stop();
-        _metrics?.RecordCustomerOperation("updateStatus", stopwatch.Elapsed.TotalMilliseconds);
         _logger.LogInformation("Customer status updated: {CustomerId} -> {NewStatus}. Reason: {Reason}", 
             id, request.Status, request.Reason);
 
@@ -287,8 +275,6 @@ public class CustomerService : ICustomerService
             }
             
             stopwatch.Stop();
-            _metrics?.RecordCustomerDeleted();
-            _metrics?.RecordCustomerOperation("delete", stopwatch.Elapsed.TotalMilliseconds);
             _logger.LogWarning("Customer deleted: {CustomerId}", id);
 
             // Publish integration event directly to RabbitMQ

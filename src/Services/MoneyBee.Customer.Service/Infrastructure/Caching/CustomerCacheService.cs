@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
 using MoneyBee.Customer.Service.Application.DTOs;
-using MoneyBee.Customer.Service.Infrastructure.Metrics;
 using StackExchange.Redis;
 
 namespace MoneyBee.Customer.Service.Infrastructure.Caching;
@@ -20,19 +19,16 @@ public class CustomerCacheService : ICustomerCacheService
 {
     private readonly IConnectionMultiplexer _redis;
     private readonly ILogger<CustomerCacheService> _logger;
-    private readonly CustomerMetrics? _metrics;
     private const string CustomerCacheKeyPrefix = "customer:";
     private const string NationalIdCacheKeyPrefix = "customer:nationalid:";
     private static readonly TimeSpan DefaultExpiration = TimeSpan.FromMinutes(5);
 
     public CustomerCacheService(
         IConnectionMultiplexer redis,
-        ILogger<CustomerCacheService> logger,
-        CustomerMetrics? metrics = null)
+        ILogger<CustomerCacheService> logger)
     {
         _redis = redis;
         _logger = logger;
-        _metrics = metrics;
     }
 
     public async Task<CustomerDto?> GetCustomerAsync(Guid customerId)
@@ -45,16 +41,13 @@ public class CustomerCacheService : ICustomerCacheService
             var cachedValue = await db.StringGetAsync(cacheKey);
 
             stopwatch.Stop();
-            _metrics?.RecordCacheOperation("get", stopwatch.Elapsed.TotalMilliseconds);
 
             if (cachedValue.HasValue)
             {
-                _metrics?.RecordCacheHit();
                 _logger.LogDebug("Cache HIT for customer: {CustomerId}", customerId);
                 return JsonSerializer.Deserialize<CustomerDto>(cachedValue!);
             }
 
-            _metrics?.RecordCacheMiss();
             _logger.LogDebug("Cache MISS for customer: {CustomerId}", customerId);
             return null;
         }
@@ -78,7 +71,6 @@ public class CustomerCacheService : ICustomerCacheService
             await db.StringSetAsync(cacheKey, serialized, expiration ?? DefaultExpiration);
             
             stopwatch.Stop();
-            _metrics?.RecordCacheOperation("set", stopwatch.Elapsed.TotalMilliseconds);
             
             _logger.LogDebug("Customer cached: {CustomerId}", customerId);
         }
@@ -99,16 +91,13 @@ public class CustomerCacheService : ICustomerCacheService
             var cachedValue = await db.StringGetAsync(cacheKey);
 
             stopwatch.Stop();
-            _metrics?.RecordCacheOperation("get", stopwatch.Elapsed.TotalMilliseconds);
 
             if (cachedValue.HasValue)
             {
-                _metrics?.RecordCacheHit();
                 _logger.LogDebug("Cache HIT for national ID: {NationalId}", MaskNationalId(nationalId));
                 return JsonSerializer.Deserialize<CustomerDto>(cachedValue!);
             }
 
-            _metrics?.RecordCacheMiss();
             _logger.LogDebug("Cache MISS for national ID: {NationalId}", MaskNationalId(nationalId));
             return null;
         }
@@ -132,7 +121,6 @@ public class CustomerCacheService : ICustomerCacheService
             await db.StringSetAsync(cacheKey, serialized, expiration ?? DefaultExpiration);
             
             stopwatch.Stop();
-            _metrics?.RecordCacheOperation("set", stopwatch.Elapsed.TotalMilliseconds);
             
             _logger.LogDebug("Customer cached by national ID: {NationalId}", MaskNationalId(nationalId));
         }
@@ -153,7 +141,6 @@ public class CustomerCacheService : ICustomerCacheService
             await db.KeyDeleteAsync(cacheKey);
             
             stopwatch.Stop();
-            _metrics?.RecordCacheOperation("delete", stopwatch.Elapsed.TotalMilliseconds);
             
             _logger.LogDebug("Customer cache invalidated: {CustomerId}", customerId);
         }
@@ -174,7 +161,6 @@ public class CustomerCacheService : ICustomerCacheService
             await db.KeyDeleteAsync(cacheKey);
             
             stopwatch.Stop();
-            _metrics?.RecordCacheOperation("delete", stopwatch.Elapsed.TotalMilliseconds);
             
             _logger.LogDebug("Customer cache invalidated by national ID: {NationalId}", MaskNationalId(nationalId));
         }

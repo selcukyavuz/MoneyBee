@@ -4,7 +4,6 @@ using MoneyBee.Auth.Service.Application.Interfaces;
 using MoneyBee.Auth.Service.Domain.Entities;
 using MoneyBee.Auth.Service.Domain.Interfaces;
 using MoneyBee.Auth.Service.Helpers;
-using MoneyBee.Auth.Service.Infrastructure.Metrics;
 
 namespace MoneyBee.Auth.Service.Application.Services;
 
@@ -13,19 +12,16 @@ public class ApiKeyService : IApiKeyService
     private readonly IApiKeyRepository _repository;
     private readonly ILogger<ApiKeyService> _logger;
     private readonly IApiKeyCacheService _cacheService;
-    private readonly AuthMetrics? _metrics;
     private static readonly TimeSpan CacheExpiration = TimeSpan.FromMinutes(5);
 
     public ApiKeyService(
         IApiKeyRepository repository,
         ILogger<ApiKeyService> logger,
-        IApiKeyCacheService cacheService,
-        AuthMetrics? metrics = null)
+        IApiKeyCacheService cacheService)
     {
         _repository = repository;
         _logger = logger;
         _cacheService = cacheService;
-        _metrics = metrics;
     }
 
     public async Task<CreateApiKeyResponse> CreateApiKeyAsync(CreateApiKeyRequest request)
@@ -48,7 +44,6 @@ public class ApiKeyService : IApiKeyService
 
         var created = await _repository.CreateAsync(entity);
 
-        _metrics?.RecordApiKeyCreated();
         _logger.LogInformation("API Key created: {KeyId} - {KeyName}", created.Id, created.Name);
 
         return new CreateApiKeyResponse
@@ -120,7 +115,6 @@ public class ApiKeyService : IApiKeyService
         // Invalidate cache since key status/details changed
         await _cacheService.InvalidateCacheAsync(updated.KeyHash);
 
-        _metrics?.RecordApiKeyUpdated();
         _logger.LogInformation("API Key updated: {KeyId}", id);
 
         return new ApiKeyDto
@@ -150,7 +144,6 @@ public class ApiKeyService : IApiKeyService
             // Invalidate cache for deleted key
             await _cacheService.InvalidateCacheAsync(key.KeyHash);
             
-            _metrics?.RecordApiKeyDeleted();
             _logger.LogWarning("API Key deleted: {KeyId} - {KeyName}", id, key.Name);
         }
 
@@ -164,7 +157,6 @@ public class ApiKeyService : IApiKeyService
         if (string.IsNullOrWhiteSpace(apiKey) || !ApiKeyHelper.IsValidApiKeyFormat(apiKey))
         {
             stopwatch.Stop();
-            _metrics?.RecordValidation(false, stopwatch.Elapsed.TotalMilliseconds);
             return false;
         }
 
@@ -175,7 +167,6 @@ public class ApiKeyService : IApiKeyService
         if (cachedResult.HasValue)
         {
             stopwatch.Stop();
-            _metrics?.RecordValidation(cachedResult.Value, stopwatch.Elapsed.TotalMilliseconds);
             return cachedResult.Value;
         }
 
@@ -187,7 +178,6 @@ public class ApiKeyService : IApiKeyService
             // Cache negative result for shorter time to allow quick reactivation
             await _cacheService.SetValidationResultAsync(keyHash, false, TimeSpan.FromMinutes(1));
             stopwatch.Stop();
-            _metrics?.RecordValidation(false, stopwatch.Elapsed.TotalMilliseconds);
             return false;
         }
 
@@ -196,14 +186,12 @@ public class ApiKeyService : IApiKeyService
             // Cache expired key result
             await _cacheService.SetValidationResultAsync(keyHash, false, TimeSpan.FromMinutes(1));
             stopwatch.Stop();
-            _metrics?.RecordValidation(false, stopwatch.Elapsed.TotalMilliseconds);
             return false;
         }
 
         // Cache positive result
         await _cacheService.SetValidationResultAsync(keyHash, true, CacheExpiration);
         stopwatch.Stop();
-        _metrics?.RecordValidation(true, stopwatch.Elapsed.TotalMilliseconds);
         return true;
     }
 
