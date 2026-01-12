@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using MoneyBee.Common.DDD;
 using MoneyBee.Common.Enums;
+using MoneyBee.Common.Events;
 using MoneyBee.Common.Exceptions;
 using MoneyBee.Common.Services;
 using MoneyBee.Common.ValueObjects;
@@ -11,6 +11,7 @@ using MoneyBee.Transfer.Service.Domain.Interfaces;
 using MoneyBee.Transfer.Service.Domain.Services;
 using MoneyBee.Transfer.Service.Helpers;
 using MoneyBee.Transfer.Service.Infrastructure.ExternalServices;
+using MoneyBee.Transfer.Service.Infrastructure.Messaging;
 
 namespace MoneyBee.Transfer.Service.Application.Services;
 
@@ -20,7 +21,7 @@ public class TransferService : ITransferService
     private readonly ICustomerService _customerService;
     private readonly IFraudDetectionService _fraudService;
     private readonly IExchangeRateService _exchangeRateService;
-    private readonly IDomainEventDispatcher _domainEventDispatcher;
+    private readonly IEventPublisher _eventPublisher;
     private readonly IDistributedLockService _distributedLock;
     private readonly TransferDomainService _domainService;
     private readonly ILogger<TransferService> _logger;
@@ -32,7 +33,7 @@ public class TransferService : ITransferService
         ICustomerService customerService,
         IFraudDetectionService fraudService,
         IExchangeRateService exchangeRateService,
-        IDomainEventDispatcher domainEventDispatcher,
+        IEventPublisher eventPublisher,
         IDistributedLockService distributedLock,
         TransferDomainService domainService,
         ILogger<TransferService> logger)
@@ -41,7 +42,7 @@ public class TransferService : ITransferService
         _customerService = customerService;
         _fraudService = fraudService;
         _exchangeRateService = exchangeRateService;
-        _domainEventDispatcher = domainEventDispatcher;
+        _eventPublisher = eventPublisher;
         _distributedLock = distributedLock;
         _domainService = domainService;
         _logger = logger;
@@ -180,9 +181,15 @@ public class TransferService : ITransferService
 
         await _repository.CreateAsync(transfer);
 
-        // Dispatch domain events to handlers
-        await _domainEventDispatcher.DispatchAsync(transfer.DomainEvents);
-        transfer.ClearDomainEvents();
+        // Publish integration event directly to RabbitMQ
+        await _eventPublisher.PublishAsync(new TransferCreatedEvent
+        {
+            TransferId = transfer.Id,
+            SenderId = transfer.SenderId,
+            ReceiverId = transfer.ReceiverId,
+            Amount = transfer.Amount,
+            Currency = transfer.Currency.ToString()
+        });
 
         _logger.LogInformation("Transfer created: {TransferId} - Code: {TransactionCode}, Amount: {Amount} {Currency}",
             transfer.Id, transfer.TransactionCode, transfer.Amount, transfer.Currency);
@@ -213,9 +220,12 @@ public class TransferService : ITransferService
 
                 await _repository.UpdateAsync(transfer);
 
-                // Dispatch domain events
-                await _domainEventDispatcher.DispatchAsync(transfer.DomainEvents);
-                transfer.ClearDomainEvents();
+                // Publish integration event directly to RabbitMQ
+                await _eventPublisher.PublishAsync(new TransferCompletedEvent
+                {
+                    TransferId = transfer.Id,
+                    TransactionCode = transfer.TransactionCode
+                });
 
                 _logger.LogInformation("Transfer completed: {TransferId} - Code: {TransactionCode}",
                     transfer.Id, transfer.TransactionCode);
@@ -265,9 +275,12 @@ public class TransferService : ITransferService
 
                 await _repository.UpdateAsync(transfer);
 
-                // Dispatch domain events
-                await _domainEventDispatcher.DispatchAsync(transfer.DomainEvents);
-                transfer.ClearDomainEvents();
+                // Publish integration event directly to RabbitMQ
+                await _eventPublisher.PublishAsync(new TransferCancelledEvent
+                {
+                    TransferId = transfer.Id,
+                    Reason = request.Reason ?? string.Empty
+                });
 
                 _logger.LogInformation("Transfer cancelled: {TransferId} - Reason: {Reason}",
                     transfer.Id, request.Reason);

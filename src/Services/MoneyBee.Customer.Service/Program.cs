@@ -1,9 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using MoneyBee.Common.DDD;
 using MoneyBee.Common.Services;
-using MoneyBee.Customer.Service.Application.DomainEventHandlers;
 using MoneyBee.Customer.Service.Application.Interfaces;
-using MoneyBee.Customer.Service.Domain.Events;
 using MoneyBee.Customer.Service.Domain.Interfaces;
 using MoneyBee.Customer.Service.Infrastructure.Caching;
 using MoneyBee.Customer.Service.Infrastructure.Data;
@@ -111,12 +108,6 @@ builder.Services.AddOpenTelemetry()
 
 // DDD - Domain Services
 builder.Services.AddScoped<MoneyBee.Customer.Service.Domain.Services.CustomerDomainService>();
-
-// DDD - Domain Event Handlers
-builder.Services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
-builder.Services.AddScoped<IDomainEventHandler<CustomerCreatedDomainEvent>, CustomerCreatedDomainEventHandler>();
-builder.Services.AddScoped<IDomainEventHandler<CustomerDeletedDomainEvent>, CustomerDeletedDomainEventHandler>();
-builder.Services.AddScoped<IDomainEventHandler<CustomerStatusChangedDomainEvent>, CustomerStatusChangedDomainEventHandler>();
 
 // Infrastructure Services
 builder.Services.AddScoped<IKycService, KycService>();

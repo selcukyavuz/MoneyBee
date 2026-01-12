@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using MoneyBee.Common.DDD;
 using CustomerEntity = MoneyBee.Customer.Service.Domain.Entities.Customer;
 using MoneyBee.Common.Enums;
 
@@ -16,10 +15,6 @@ public class CustomerDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-
-        // Ignore base classes that are not entities
-        modelBuilder.Ignore<DomainEvent>();
-        modelBuilder.Ignore<AggregateRoot>();
 
         // Configure Customer
         modelBuilder.Entity<CustomerEntity>(entity =>

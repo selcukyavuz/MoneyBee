@@ -1,7 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using MoneyBee.Common.DDD;
 using MoneyBee.Common.Enums;
-using MoneyBee.Transfer.Service.Domain.Events;
 
 namespace MoneyBee.Transfer.Service.Domain.Entities;
 
@@ -100,14 +99,6 @@ public class Transfer : AggregateRoot
             CreatedAt = DateTime.UtcNow
         };
 
-        transfer.AddDomainEvent(new TransferCreatedDomainEvent(
-            transfer.Id,
-            transfer.SenderId,
-            transfer.ReceiverId,
-            transfer.Amount,
-            transfer.Currency,
-            transfer.TransactionCode));
-
         return transfer;
     }
 
@@ -158,13 +149,6 @@ public class Transfer : AggregateRoot
 
         Status = TransferStatus.Completed;
         CompletedAt = DateTime.UtcNow;
-
-        AddDomainEvent(new TransferCompletedDomainEvent(
-            Id,
-            TransactionCode,
-            SenderId,
-            ReceiverId,
-            AmountInTRY));
     }
 
     public void Cancel(string? reason)
@@ -175,8 +159,6 @@ public class Transfer : AggregateRoot
         Status = TransferStatus.Cancelled;
         CancelledAt = DateTime.UtcNow;
         CancellationReason = reason;
-
-        AddDomainEvent(new TransferCancelledDomainEvent(Id, TransactionCode, reason));
     }
 
     public bool RequiresApproval()

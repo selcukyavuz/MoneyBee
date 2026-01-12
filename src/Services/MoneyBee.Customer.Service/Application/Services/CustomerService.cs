@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using MoneyBee.Common.DDD;
 using MoneyBee.Common.Enums;
 using MoneyBee.Common.Events;
 using MoneyBee.Common.ValueObjects;
@@ -20,7 +19,6 @@ public class CustomerService : ICustomerService
     private readonly ICustomerRepository _repository;
     private readonly IKycService _kycService;
     private readonly IEventPublisher _eventPublisher;
-    private readonly IDomainEventDispatcher _domainEventDispatcher;
     private readonly CustomerDomainService _domainService;
     private readonly ILogger<CustomerService> _logger;
     private readonly ICustomerCacheService? _cacheService;
@@ -30,7 +28,6 @@ public class CustomerService : ICustomerService
         ICustomerRepository repository,
         IKycService kycService,
         IEventPublisher eventPublisher,
-        IDomainEventDispatcher domainEventDispatcher,
         CustomerDomainService domainService,
         ILogger<CustomerService> logger,
         ICustomerCacheService? cacheService = null,
@@ -39,7 +36,6 @@ public class CustomerService : ICustomerService
         _repository = repository;
         _kycService = kycService;
         _eventPublisher = eventPublisher;
-        _domainEventDispatcher = domainEventDispatcher;
         _domainService = domainService;
         _logger = logger;
         _cacheService = cacheService;
@@ -97,9 +93,16 @@ public class CustomerService : ICustomerService
 
         await _repository.CreateAsync(customer);
 
-        // Dispatch domain events to handlers
-        await _domainEventDispatcher.DispatchAsync(customer.DomainEvents);
-        customer.ClearDomainEvents();
+        // Publish integration event directly to RabbitMQ
+        await _eventPublisher.PublishAsync(new CustomerCreatedEvent
+        {
+            CustomerId = customer.Id,
+            NationalId = customer.NationalId,
+            FirstName = customer.FirstName,
+            LastName = customer.LastName,
+            Email = customer.Email ?? string.Empty,
+            Timestamp = DateTime.UtcNow
+        });
 
         var dto = MapToDto(customer);
         
@@ -230,6 +233,9 @@ public class CustomerService : ICustomerService
         // Use domain service for validation
         _domainService.ValidateCustomerUpdate(customer, request.Status);
 
+        // Capture old status before update for event
+        var oldStatus = customer.Status;
+
         // Use aggregate method to update status
         customer.UpdateStatus(request.Status);
 
@@ -247,9 +253,14 @@ public class CustomerService : ICustomerService
         _logger.LogInformation("Customer status updated: {CustomerId} -> {NewStatus}. Reason: {Reason}", 
             id, request.Status, request.Reason);
 
-        // Dispatch domain events
-        await _domainEventDispatcher.DispatchAsync(customer.DomainEvents);
-        customer.ClearDomainEvents();
+        // Publish integration event directly to RabbitMQ
+        await _eventPublisher.PublishAsync(new CustomerStatusChangedEvent
+        {
+            CustomerId = customer.Id,
+            PreviousStatus = oldStatus.ToString(),
+            NewStatus = customer.Status.ToString(),
+            Reason = request.Reason ?? string.Empty
+        });
 
         return true;
     }
@@ -280,9 +291,13 @@ public class CustomerService : ICustomerService
             _metrics?.RecordCustomerOperation("delete", stopwatch.Elapsed.TotalMilliseconds);
             _logger.LogWarning("Customer deleted: {CustomerId}", id);
 
-            // Dispatch domain events
-            await _domainEventDispatcher.DispatchAsync(customer.DomainEvents);
-            customer.ClearDomainEvents();
+            // Publish integration event directly to RabbitMQ
+            await _eventPublisher.PublishAsync(new CustomerDeletedEvent
+            {
+                CustomerId = customer.Id,
+                NationalId = customer.NationalId,
+                Timestamp = DateTime.UtcNow
+            });
         }
 
         return deleted;

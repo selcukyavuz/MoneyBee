@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using MoneyBee.Common.DDD;
 using MoneyBee.Transfer.Service.Domain.Entities;
 using MoneyBee.Common.Enums;
 
@@ -16,10 +15,6 @@ public class TransferDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-
-        // Ignore base classes that are not entities
-        modelBuilder.Ignore<DomainEvent>();
-        modelBuilder.Ignore<AggregateRoot>();
 
         // Configure Transfer
         modelBuilder.Entity<Domain.Entities.Transfer>(entity =>

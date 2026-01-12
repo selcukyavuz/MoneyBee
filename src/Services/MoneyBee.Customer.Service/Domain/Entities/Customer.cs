@@ -1,7 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using MoneyBee.Common.DDD;
 using MoneyBee.Common.Enums;
-using MoneyBee.Customer.Service.Domain.Events;
 
 namespace MoneyBee.Customer.Service.Domain.Entities;
 
@@ -78,13 +77,6 @@ public class Customer : AggregateRoot
             CreatedAt = DateTime.UtcNow
         };
 
-        customer.AddDomainEvent(new CustomerCreatedDomainEvent(
-            customer.Id,
-            customer.NationalId,
-            customer.FirstName,
-            customer.LastName,
-            customer.Email ?? string.Empty));
-
         return customer;
     }
 
@@ -96,8 +88,6 @@ public class Customer : AggregateRoot
         var oldStatus = Status;
         Status = newStatus;
         UpdatedAt = DateTime.UtcNow;
-
-        AddDomainEvent(new CustomerStatusChangedDomainEvent(Id, oldStatus, newStatus));
     }
 
     public void UpdateInformation(
@@ -123,7 +113,7 @@ public class Customer : AggregateRoot
 
     public void MarkForDeletion()
     {
-        AddDomainEvent(new CustomerDeletedDomainEvent(Id, NationalId));
+        // Domain event removed - publish integration event directly in service layer
     }
 
     public bool IsAdult()

@@ -1,8 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using MoneyBee.Common.DDD;
 using MoneyBee.Common.Services;
-using MoneyBee.Transfer.Service.Application.DomainEventHandlers;
-using MoneyBee.Transfer.Service.Domain.Events;
 using MoneyBee.Transfer.Service.Infrastructure.Data;
 using MoneyBee.Transfer.Service.Infrastructure.ExternalServices;
 using MoneyBee.Transfer.Service.Infrastructure.Messaging;
@@ -112,12 +109,6 @@ builder.Services.AddScoped<MoneyBee.Transfer.Service.Domain.Services.TransferDom
 // Infrastructure Services
 builder.Services.AddSingleton<IDistributedLockService, RedisDistributedLockService>();
 builder.Services.AddSingleton<MoneyBee.Transfer.Service.Infrastructure.Messaging.IEventPublisher, MoneyBee.Transfer.Service.Infrastructure.Messaging.RabbitMqEventPublisher>();
-
-// DDD - Domain Event Handlers
-builder.Services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
-builder.Services.AddScoped<IDomainEventHandler<TransferCreatedDomainEvent>, TransferCreatedDomainEventHandler>();
-builder.Services.AddScoped<IDomainEventHandler<TransferCompletedDomainEvent>, TransferCompletedDomainEventHandler>();
-builder.Services.AddScoped<IDomainEventHandler<TransferCancelledDomainEvent>, TransferCancelledDomainEventHandler>();
 
 // Background Services
 builder.Services.AddHostedService<CustomerEventConsumer>();
