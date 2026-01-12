@@ -13,35 +13,31 @@ public class CustomerEventConsumer : BackgroundService
 {
     private readonly ILogger<CustomerEventConsumer> _logger;
     private readonly IServiceProvider _serviceProvider;
-    private readonly IConfiguration _configuration;
-    private IConnection? _connection;
+    private readonly IConnection? _connection;
     private IModel? _channel;
 
     public CustomerEventConsumer(
         ILogger<CustomerEventConsumer> logger,
         IServiceProvider serviceProvider,
-        IConfiguration configuration)
+        IConnection? connection)
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
-        _configuration = configuration;
+        _connection = connection;
     }
 
     public override Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Customer Event Consumer starting...");
         
+        if (_connection == null)
+        {
+            _logger.LogWarning("RabbitMQ connection is not available. Customer Event Consumer will not start.");
+            return Task.CompletedTask;
+        }
+
         try
         {
-            var factory = new ConnectionFactory
-            {
-                HostName = _configuration["RabbitMQ:Host"] ?? "localhost",
-                UserName = _configuration["RabbitMQ:Username"] ?? "moneybee",
-                Password = _configuration["RabbitMQ:Password"] ?? "moneybee123",
-                DispatchConsumersAsync = true
-            };
-
-            _connection = factory.CreateConnection();
             _channel = _connection.CreateModel();
 
             // Declare exchange

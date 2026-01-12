@@ -1,6 +1,6 @@
 using FluentAssertions;
 using MoneyBee.Transfer.Service.Domain.Interfaces;
-using MoneyBee.Transfer.Service.Domain.Services;
+using MoneyBee.Transfer.Service.Domain.Validators;
 using Moq;
 using System.Collections.Concurrent;
 
@@ -14,13 +14,11 @@ public class DailyLimitConcurrencyTests
 {
     private readonly Mock<ITransferRepository> _mockRepository;
     private readonly Mock<IDistributedLockService> _mockLockService;
-    private readonly TransferDomainService _domainService;
     
     public DailyLimitConcurrencyTests()
     {
         _mockRepository = new Mock<ITransferRepository>();
         _mockLockService = new Mock<IDistributedLockService>();
-        _domainService = new TransferDomainService();
     }
 
     /// <summary>

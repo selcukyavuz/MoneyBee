@@ -1,20 +1,23 @@
 using MoneyBee.Common.Enums;
+using MoneyBee.Common.Results;
 using CustomerEntity = MoneyBee.Customer.Service.Domain.Entities.Customer;
 
-namespace MoneyBee.Customer.Service.Domain.Services;
+namespace MoneyBee.Customer.Service.Domain.Validators;
 
 /// <summary>
-/// Domain Service for Customer validation and business rules
+/// Domain validator for Customer validation and business rules
 /// </summary>
-public static class CustomerDomainService
+public static class CustomerValidator
 {
-    public static void ValidateCustomerForCreation(CustomerEntity customer)
+    public static Result ValidateCustomerForCreation(CustomerEntity customer)
     {
         if (!customer.IsAdult())
-            throw new InvalidOperationException("Customer must be at least 18 years old");
+            return Result.Failure("Customer must be at least 18 years old");
 
         if (customer.CustomerType == CustomerType.Corporate && string.IsNullOrWhiteSpace(customer.TaxNumber))
-            throw new InvalidOperationException("Corporate customers must have a tax number");
+            return Result.Failure("Corporate customers must have a tax number");
+
+        return Result.Success();
     }
 
     public static bool CanCustomerReceiveTransfer(CustomerEntity customer)
@@ -27,12 +30,14 @@ public static class CustomerDomainService
         return customer.Status == CustomerStatus.Active && customer.IsAdult();
     }
 
-    public static void ValidateCustomerUpdate(CustomerEntity customer, CustomerStatus newStatus)
+    public static Result ValidateCustomerUpdate(CustomerEntity customer, CustomerStatus newStatus)
     {
         if (customer.Status == CustomerStatus.Blocked && newStatus == CustomerStatus.Active)
         {
             if (!customer.KycVerified)
-                throw new InvalidOperationException("Cannot activate blocked customer without KYC verification");
+                return Result.Failure("Cannot activate blocked customer without KYC verification");
         }
+
+        return Result.Success();
     }
 }

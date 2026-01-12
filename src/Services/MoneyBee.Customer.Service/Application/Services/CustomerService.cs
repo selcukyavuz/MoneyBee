@@ -1,10 +1,11 @@
 using System.Diagnostics;
 using MoneyBee.Common.Enums;
 using MoneyBee.Common.Events;
+using MoneyBee.Common.Results;
 using MoneyBee.Customer.Service.Application.DTOs;
 using MoneyBee.Customer.Service.Application.Interfaces;
 using MoneyBee.Customer.Service.Domain.Interfaces;
-using MoneyBee.Customer.Service.Domain.Services;
+using MoneyBee.Customer.Service.Domain.Validators;
 using MoneyBee.Customer.Service.Infrastructure.ExternalServices;
 using MoneyBee.Customer.Service.Infrastructure.Messaging;
 using CustomerEntity = MoneyBee.Customer.Service.Domain.Entities.Customer;
@@ -16,33 +17,28 @@ public class CustomerService : ICustomerService
     private readonly ICustomerRepository _repository;
     private readonly IKycService _kycService;
     private readonly IEventPublisher _eventPublisher;
-    private readonly CustomerDomainService _domainService;
     private readonly ILogger<CustomerService> _logger;
 
     public CustomerService(
         ICustomerRepository repository,
         IKycService kycService,
         IEventPublisher eventPublisher,
-        CustomerDomainService domainService,
         ILogger<CustomerService> logger)
     {
         _repository = repository;
         _kycService = kycService;
         _eventPublisher = eventPublisher;
-        _domainService = domainService;
         _logger = logger;
     }
 
-    public async Task<CustomerDto> CreateCustomerAsync(CreateCustomerRequest request)
+    public async Task<Result<CustomerDto>> CreateCustomerAsync(CreateCustomerRequest request)
     {
         var stopwatch = Stopwatch.StartNew();
         
         // Check if customer already exists
         var existingCustomer = await _repository.GetByNationalIdAsync(request.NationalId);
         if (existingCustomer != null)
-        {
-            throw new InvalidOperationException("Customer with this National ID already exists");
-        }
+            return Result<CustomerDto>.Failure("Customer with this National ID already exists");
 
         // Create customer aggregate using factory method
         var customer = CustomerEntity.Create(
@@ -57,7 +53,9 @@ public class CustomerService : ICustomerService
             request.Email);
 
         // Use domain service for validation
-        _domainService.ValidateCustomerForCreation(customer);
+        var validationResult = CustomerValidator.ValidateCustomerForCreation(customer);
+        if (!validationResult.IsSuccess)
+            return Result<CustomerDto>.Failure(validationResult.Error!);
 
         // Perform KYC verification (non-blocking)
         var kycStopwatch = Stopwatch.StartNew();
@@ -101,7 +99,7 @@ public class CustomerService : ICustomerService
         
         _logger.LogInformation("{LogMessage}: {CustomerId} - {NationalId}", logMessage, customer.Id, customer.NationalId);
 
-        return dto;
+        return Result<CustomerDto>.Success(dto);
     }
 
     public async Task<IEnumerable<CustomerDto>> GetAllCustomersAsync(int pageNumber = 1, int pageSize = 50)
@@ -112,30 +110,36 @@ public class CustomerService : ICustomerService
         return customers.Select(MapToDto);
     }
 
-    public async Task<CustomerDto?> GetCustomerByIdAsync(Guid id)
+    public async Task<Result<CustomerDto>> GetCustomerByIdAsync(Guid id)
     {
         var stopwatch = Stopwatch.StartNew();
         var customer = await _repository.GetByIdAsync(id);
         stopwatch.Stop();
         
-        return customer != null ? MapToDto(customer) : null;
+        if (customer == null)
+            return Result<CustomerDto>.Failure("Customer not found");
+        
+        return Result<CustomerDto>.Success(MapToDto(customer));
     }
 
-    public async Task<CustomerDto?> GetCustomerByNationalIdAsync(string nationalId)
+    public async Task<Result<CustomerDto>> GetCustomerByNationalIdAsync(string nationalId)
     {
         var stopwatch = Stopwatch.StartNew();
         var customer = await _repository.GetByNationalIdAsync(nationalId);
         stopwatch.Stop();
         
-        return customer != null ? MapToDto(customer) : null;
+        if (customer == null)
+            return Result<CustomerDto>.Failure("Customer not found");
+        
+        return Result<CustomerDto>.Success(MapToDto(customer));
     }
 
-    public async Task<CustomerDto?> UpdateCustomerAsync(Guid id, UpdateCustomerRequest request)
+    public async Task<Result<CustomerDto>> UpdateCustomerAsync(Guid id, UpdateCustomerRequest request)
     {
         var stopwatch = Stopwatch.StartNew();
         var customer = await _repository.GetByIdAsync(id);
         if (customer == null)
-            return null;
+            return Result<CustomerDto>.Failure("Customer not found");
 
         // Use aggregate method to update information
         customer.UpdateInformation(
@@ -151,18 +155,20 @@ public class CustomerService : ICustomerService
 
         _logger.LogInformation("Customer updated: {CustomerId}", id);
 
-        return MapToDto(customer);
+        return Result<CustomerDto>.Success(MapToDto(customer));
     }
 
-    public async Task<bool> UpdateCustomerStatusAsync(Guid id, UpdateCustomerStatusRequest request)
+    public async Task<Result> UpdateCustomerStatusAsync(Guid id, UpdateCustomerStatusRequest request)
     {
         var stopwatch = Stopwatch.StartNew();
         var customer = await _repository.GetByIdAsync(id);
         if (customer == null)
-            return false;
+            return Result.Failure("Customer not found");
 
         // Use domain service for validation
-        _domainService.ValidateCustomerUpdate(customer, request.Status);
+        var validationResult = CustomerValidator.ValidateCustomerUpdate(customer, request.Status);
+        if (!validationResult.IsSuccess)
+            return Result.Failure(validationResult.Error!);
 
         // Capture old status before update for event
         var oldStatus = customer.Status;
@@ -185,7 +191,7 @@ public class CustomerService : ICustomerService
             Reason = request.Reason ?? string.Empty
         });
 
-        return true;
+        return Result.Success();
     }
 
     public async Task<bool> DeleteCustomerAsync(Guid id)
@@ -233,7 +239,7 @@ public class CustomerService : ICustomerService
             }
 
             // Use domain service to check if customer can send transfers
-            var canSend = _domainService.CanCustomerSendTransfer(customer);
+            var canSend = CustomerValidator.CanCustomerSendTransfer(customer);
 
             if (!canSend)
             {

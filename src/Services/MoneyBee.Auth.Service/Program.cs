@@ -3,6 +3,7 @@ using MoneyBee.Auth.Service.Application.Interfaces;
 using MoneyBee.Auth.Service.Application.Services;
 using MoneyBee.Auth.Service.Application.Validators;
 using MoneyBee.Auth.Service.Domain.Interfaces;
+using MoneyBee.Auth.Service.Endpoints;
 using MoneyBee.Auth.Service.Infrastructure.Data;
 using MoneyBee.Auth.Service.Infrastructure.Repositories;
 using MoneyBee.Auth.Service.Middleware;
@@ -10,6 +11,7 @@ using MoneyBee.Auth.Service.Services;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Serilog;
+using StackExchange.Redis;
 
 // PostgreSQL timestamp compatibility
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
@@ -24,11 +26,10 @@ Log.Logger = new LoggerConfiguration()
 builder.Host.UseSerilog();
 
 // Add services to the container
-builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-    {
-        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
-    });
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -63,6 +64,13 @@ builder.Services.AddSwaggerGen(c =>
 // Database
 builder.Services.AddDbContext<AuthDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Redis
+var redisConnectionString = builder.Configuration.GetValue<string>("Redis:ConnectionString") ?? "localhost:6379";
+var redisConfig = ConfigurationOptions.Parse(redisConnectionString);
+redisConfig.AbortOnConnectFail = false; // Allow app to start without Redis
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp => 
+    ConnectionMultiplexer.Connect(redisConfig));
 
 // Clean Architecture - Dependency Injection
 builder.Services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
@@ -108,7 +116,8 @@ app.UseSerilogRequestLogging();
 app.UseMiddleware<ApiKeyAuthenticationMiddleware>();
 app.UseMiddleware<RateLimitMiddleware>();
 
-app.MapControllers();
+// Map endpoints
+app.MapApiKeyEndpoints();
 
 // Health check endpoint
 app.MapHealthChecks("/health");

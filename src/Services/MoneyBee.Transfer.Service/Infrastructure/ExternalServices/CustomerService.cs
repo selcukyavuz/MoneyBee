@@ -1,5 +1,6 @@
 using MoneyBee.Common.Enums;
 using MoneyBee.Common.Exceptions;
+using MoneyBee.Common.Results;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -7,7 +8,7 @@ namespace MoneyBee.Transfer.Service.Infrastructure.ExternalServices;
 
 public interface ICustomerService
 {
-    Task<CustomerInfo?> GetCustomerByNationalIdAsync(string nationalId);
+    Task<Result<CustomerInfo>> GetCustomerByNationalIdAsync(string nationalId);
 }
 
 public class CustomerInfo
@@ -42,7 +43,7 @@ public class CustomerService : ICustomerService
         };
     }
 
-    public async Task<CustomerInfo?> GetCustomerByNationalIdAsync(string nationalId)
+    public async Task<Result<CustomerInfo>> GetCustomerByNationalIdAsync(string nationalId)
     {
         try
         {
@@ -53,7 +54,7 @@ public class CustomerService : ICustomerService
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Customer Service returned error: {StatusCode}", response.StatusCode);
-                return null;
+                return Result<CustomerInfo>.Failure("Customer not found");
             }
 
             var result = await response.Content.ReadFromJsonAsync<CustomerVerificationResponse>(_jsonOptions);
@@ -61,7 +62,7 @@ public class CustomerService : ICustomerService
             if (result?.Data?.Exists != true)
             {
                 _logger.LogInformation("Customer not found: {NationalId}", nationalId);
-                return null;
+                return Result<CustomerInfo>.Failure("Customer not found");
             }
 
             // Get full customer details
@@ -70,17 +71,17 @@ public class CustomerService : ICustomerService
             if (!customerResponse.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Failed to get customer details: {StatusCode}", customerResponse.StatusCode);
-                return null;
+                return Result<CustomerInfo>.Failure("Failed to get customer details");
             }
 
             var customerResult = await customerResponse.Content.ReadFromJsonAsync<CustomerDetailsResponse>(_jsonOptions);
 
             if (customerResult?.Data == null)
             {
-                return null;
+                return Result<CustomerInfo>.Failure("Customer data not available");
             }
 
-            return new CustomerInfo
+            return Result<CustomerInfo>.Success(new CustomerInfo
             {
                 Id = customerResult.Data.Id,
                 FirstName = customerResult.Data.FirstName,
@@ -88,7 +89,7 @@ public class CustomerService : ICustomerService
                 NationalId = customerResult.Data.NationalId,
                 Status = customerResult.Data.Status,
                 KycVerified = customerResult.Data.KycVerified
-            };
+            });
         }
         catch (Exception ex)
         {

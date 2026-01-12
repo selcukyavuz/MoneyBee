@@ -1,12 +1,13 @@
 using MoneyBee.Common.Enums;
 using MoneyBee.Common.Events;
 using MoneyBee.Common.Exceptions;
+using MoneyBee.Common.Results;
 using MoneyBee.Common.Services;
 using MoneyBee.Transfer.Service.Application.DTOs;
 using MoneyBee.Transfer.Service.Application.Interfaces;
 using TransferEntity = MoneyBee.Transfer.Service.Domain.Entities.Transfer;
 using MoneyBee.Transfer.Service.Domain.Interfaces;
-using MoneyBee.Transfer.Service.Domain.Services;
+using MoneyBee.Transfer.Service.Domain.Validators;
 using MoneyBee.Transfer.Service.Helpers;
 using MoneyBee.Transfer.Service.Infrastructure.ExternalServices;
 using MoneyBee.Transfer.Service.Infrastructure.Messaging;
@@ -21,7 +22,6 @@ public class TransferService : ITransferService
     private readonly IExchangeRateService _exchangeRateService;
     private readonly IEventPublisher _eventPublisher;
     private readonly IDistributedLockService _distributedLock;
-    private readonly TransferDomainService _domainService;
     private readonly ILogger<TransferService> _logger;
 
     private const decimal DAILY_LIMIT_TRY = 10000m;
@@ -33,7 +33,6 @@ public class TransferService : ITransferService
         IExchangeRateService exchangeRateService,
         IEventPublisher eventPublisher,
         IDistributedLockService distributedLock,
-        TransferDomainService domainService,
         ILogger<TransferService> logger)
     {
         _repository = repository;
@@ -42,11 +41,10 @@ public class TransferService : ITransferService
         _exchangeRateService = exchangeRateService;
         _eventPublisher = eventPublisher;
         _distributedLock = distributedLock;
-        _domainService = domainService;
         _logger = logger;
     }
 
-    public async Task<CreateTransferResponse> CreateTransferAsync(CreateTransferRequest request)
+    public async Task<Result<CreateTransferResponse>> CreateTransferAsync(CreateTransferRequest request)
     {
         // Check idempotency
         if (!string.IsNullOrWhiteSpace(request.IdempotencyKey))
@@ -55,39 +53,31 @@ public class TransferService : ITransferService
             if (existingTransfer != null)
             {
                 _logger.LogInformation("Idempotent request detected: {IdempotencyKey}", request.IdempotencyKey);
-                return MapToCreateResponse(existingTransfer);
+                return Result<CreateTransferResponse>.Success(MapToCreateResponse(existingTransfer));
             }
         }
 
         // Validate amount
         if (request.Amount <= 0)
-        {
-            throw new ArgumentException("Amount must be greater than zero");
-        }
+            return Result<CreateTransferResponse>.Failure("Amount must be greater than zero");
 
         // Get sender customer
-        var sender = await _customerService.GetCustomerByNationalIdAsync(request.SenderNationalId);
-        if (sender == null)
-        {
-            throw new ArgumentException("Sender customer not found");
-        }
-
+        var senderResult = await _customerService.GetCustomerByNationalIdAsync(request.SenderNationalId);
+        if (!senderResult.IsSuccess)
+            return Result<CreateTransferResponse>.Failure("Sender customer not found");
+        
+        var sender = senderResult.Value!;
         if (sender.Status != CustomerStatus.Active)
-        {
-            throw new ArgumentException("Sender customer is not active");
-        }
+            return Result<CreateTransferResponse>.Failure("Sender customer is not active");
 
         // Get receiver customer
-        var receiver = await _customerService.GetCustomerByNationalIdAsync(request.ReceiverNationalId);
-        if (receiver == null)
-        {
-            throw new ArgumentException("Receiver customer not found");
-        }
-
+        var receiverResult = await _customerService.GetCustomerByNationalIdAsync(request.ReceiverNationalId);
+        if (!receiverResult.IsSuccess)
+            return Result<CreateTransferResponse>.Failure("Receiver customer not found");
+        
+        var receiver = receiverResult.Value!;
         if (receiver.Status == CustomerStatus.Blocked)
-        {
-            throw new ArgumentException("Receiver customer is blocked");
-        }
+            return Result<CreateTransferResponse>.Failure("Receiver customer is blocked");
 
         // Get exchange rate if needed
         decimal amountInTRY;
@@ -104,7 +94,7 @@ public class TransferService : ITransferService
             catch (ExternalServiceException ex)
             {
                 _logger.LogError(ex, "Failed to get exchange rate");
-                throw new InvalidOperationException("Exchange rate service unavailable. Please try again later.", ex);
+                return Result<CreateTransferResponse>.Failure("Exchange rate service unavailable. Please try again later.");
             }
         }
         else
@@ -113,27 +103,37 @@ public class TransferService : ITransferService
         }
 
         // Check daily limit with distributed lock to prevent race conditions
-        await _distributedLock.ExecuteWithLockAsync(
-            lockKey: $"customer:{sender.Id}:daily-limit",
-            expiry: TimeSpan.FromSeconds(10),
-            async () =>
-            {
-                var dailyTotal = await _repository.GetDailyTotalAsync(sender.Id, DateTime.Today);
-                _domainService.ValidateDailyLimit(dailyTotal, amountInTRY, DAILY_LIMIT_TRY);
-                
-                _logger.LogDebug(
-                    "Daily limit check passed for customer {CustomerId}: {DailyTotal} + {Amount} <= {Limit}",
-                    sender.Id, dailyTotal, amountInTRY, DAILY_LIMIT_TRY);
-                
-                return true;
-            });
+        try
+        {
+            await _distributedLock.ExecuteWithLockAsync(
+                lockKey: $"customer:{sender.Id}:daily-limit",
+                expiry: TimeSpan.FromSeconds(10),
+                async () =>
+                {
+                    var dailyTotal = await _repository.GetDailyTotalAsync(sender.Id, DateTime.Today);
+                    var result = TransferValidator.ValidateDailyLimit(dailyTotal, amountInTRY, DAILY_LIMIT_TRY);
+                    
+                    if (!result.IsSuccess)
+                        throw new InvalidOperationException(result.Error);
+                    
+                    _logger.LogDebug(
+                        "Daily limit check passed for customer {CustomerId}: {DailyTotal} + {Amount} <= {Limit}",
+                        sender.Id, dailyTotal, amountInTRY, DAILY_LIMIT_TRY);
+                    
+                    return true;
+                });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Result<CreateTransferResponse>.Failure(ex.Message);
+        }
 
         // Perform fraud check
         var fraudCheck = await _fraudService.CheckTransferAsync(
             sender.Id, receiver.Id, amountInTRY, sender.NationalId);
 
         // Reject if HIGH risk using domain service
-        if (_domainService.ShouldRejectTransfer(fraudCheck.RiskLevel))
+        if (TransferValidator.ShouldRejectTransfer(fraudCheck.RiskLevel))
         {
             _logger.LogWarning("Transfer rejected due to HIGH risk: Sender={SenderId}", sender.Id);
             
@@ -152,14 +152,14 @@ public class TransferService : ITransferService
 
             await _repository.CreateAsync(rejectedTransfer);
 
-            throw new InvalidOperationException("Transfer rejected due to high fraud risk");
+            return Result<CreateTransferResponse>.Failure("Transfer rejected due to high fraud risk");
         }
 
         // Calculate fee
         var transactionFee = FeeCalculator.Calculate(amountInTRY);
 
         // Use domain service to determine approval wait
-        var approvalRequiredUntil = _domainService.CalculateApprovalWaitTime(amountInTRY);
+        var approvalRequiredUntil = TransferValidator.CalculateApprovalWaitTime(amountInTRY);
 
         // Create transfer using aggregate factory method
         var transfer = TransferEntity.Create(
@@ -192,20 +192,20 @@ public class TransferService : ITransferService
         _logger.LogInformation("Transfer created: {TransferId} - Code: {TransactionCode}, Amount: {Amount} {Currency}",
             transfer.Id, transfer.TransactionCode, transfer.Amount, transfer.Currency);
 
-        return MapToCreateResponse(transfer);
+        return Result<CreateTransferResponse>.Success(MapToCreateResponse(transfer));
     }
 
-    public async Task<TransferDto> CompleteTransferAsync(string transactionCode, CompleteTransferRequest request)
+    public async Task<Result<TransferDto>> CompleteTransferAsync(string transactionCode, CompleteTransferRequest request)
     {
         var transfer = await _repository.GetByTransactionCodeAsync(transactionCode);
 
         if (transfer == null)
-        {
-            throw new ArgumentException("Transfer not found");
-        }
+            return Result<TransferDto>.Failure("Transfer not found");
 
         // Use domain service for validation
-        _domainService.ValidateTransferForCompletion(transfer, request.ReceiverNationalId);
+        var validationResult = TransferValidator.ValidateTransferForCompletion(transfer, request.ReceiverNationalId);
+        if (!validationResult.IsSuccess)
+            return Result<TransferDto>.Failure(validationResult.Error!);
 
         // Use aggregate method to complete
         transfer.Complete();
@@ -222,17 +222,15 @@ public class TransferService : ITransferService
         _logger.LogInformation("Transfer completed: {TransferId} - Code: {TransactionCode}",
             transfer.Id, transfer.TransactionCode);
 
-        return MapToDto(transfer);
+        return Result<TransferDto>.Success(MapToDto(transfer));
     }
 
-    public async Task<TransferDto> CancelTransferAsync(string transactionCode, CancelTransferRequest request)
+    public async Task<Result<TransferDto>> CancelTransferAsync(string transactionCode, CancelTransferRequest request)
     {
         var transfer = await _repository.GetByTransactionCodeAsync(transactionCode);
 
         if (transfer == null)
-        {
-            throw new ArgumentException("Transfer not found");
-        }
+            return Result<TransferDto>.Failure("Transfer not found");
 
         // Use aggregate method to cancel
         transfer.Cancel(request.Reason);
@@ -249,13 +247,17 @@ public class TransferService : ITransferService
         _logger.LogInformation("Transfer cancelled: {TransferId} - Reason: {Reason}",
             transfer.Id, request.Reason);
 
-        return MapToDto(transfer);
+        return Result<TransferDto>.Success(MapToDto(transfer));
     }
 
-    public async Task<TransferDto?> GetTransferByCodeAsync(string transactionCode)
+    public async Task<Result<TransferDto>> GetTransferByCodeAsync(string transactionCode)
     {
         var transfer = await _repository.GetByTransactionCodeAsync(transactionCode);
-        return transfer != null ? MapToDto(transfer) : null;
+        
+        if (transfer == null)
+            return Result<TransferDto>.Failure("Transfer not found");
+        
+        return Result<TransferDto>.Success(MapToDto(transfer));
     }
 
     public async Task<IEnumerable<TransferDto>> GetCustomerTransfersAsync(Guid customerId)

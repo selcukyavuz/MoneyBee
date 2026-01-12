@@ -1,0 +1,27 @@
+namespace MoneyBee.Customer.Service.Endpoints;
+
+/// <summary>
+/// Customer endpoints registration
+/// </summary>
+public static class CustomerEndpoints
+{
+    /// <summary>
+    /// Maps all Customer endpoints to the route builder
+    /// </summary>
+    public static RouteGroupBuilder MapCustomerEndpoints(this IEndpointRouteBuilder routes)
+    {
+        var group = routes.MapGroup("/api/customers")
+            .WithTags("Customers")
+            .WithOpenApi();
+
+        group.MapCreateCustomer();
+        group.MapGetCustomer();
+        group.MapGetCustomers();
+        group.MapUpdateCustomer();
+        group.MapUpdateCustomerStatus();
+        group.MapDeleteCustomer();
+        group.MapVerifyCustomer();
+
+        return group;
+    }
+}

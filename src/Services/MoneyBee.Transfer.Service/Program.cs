@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using MoneyBee.Common.Services;
+using MoneyBee.Transfer.Service.Endpoints;
 using MoneyBee.Transfer.Service.Infrastructure.Data;
 using MoneyBee.Transfer.Service.Infrastructure.ExternalServices;
 using MoneyBee.Transfer.Service.Infrastructure.Messaging;
+using RabbitMQ.Client;
 using Serilog;
 using StackExchange.Redis;
 
@@ -19,11 +21,10 @@ Log.Logger = new LoggerConfiguration()
 builder.Host.UseSerilog();
 
 // Add services to the container
-builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-    {
-        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
-    });
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -57,14 +58,35 @@ builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<MoneyBee.Transfer.Service.Domain.Interfaces.ITransferRepository, MoneyBee.Transfer.Service.Infrastructure.Repositories.TransferRepository>();
 builder.Services.AddScoped<MoneyBee.Transfer.Service.Application.Interfaces.ITransferService, MoneyBee.Transfer.Service.Application.Services.TransferService>();
 
-// DDD - Domain Services
-builder.Services.AddScoped<MoneyBee.Transfer.Service.Domain.Services.TransferDomainService>();
-
 // Redis
+var redisConfig = ConfigurationOptions.Parse(builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379");
+redisConfig.AbortOnConnectFail = false;
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+    ConnectionMultiplexer.Connect(redisConfig));
+
+// RabbitMQ
+builder.Services.AddSingleton<IConnection>(sp =>
 {
-    var configuration = ConfigurationOptions.Parse(builder.Configuration.GetConnectionString("Redis")!);
-    return ConnectionMultiplexer.Connect(configuration);
+    var logger = sp.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        var factory = new ConnectionFactory()
+        {
+            HostName = builder.Configuration["RabbitMQ:Host"] ?? "localhost",
+            UserName = builder.Configuration["RabbitMQ:Username"] ?? "moneybee",
+            Password = builder.Configuration["RabbitMQ:Password"] ?? "moneybee123",
+            AutomaticRecoveryEnabled = true,
+            NetworkRecoveryInterval = TimeSpan.FromSeconds(10)
+        };
+        var connection = factory.CreateConnection();
+        logger.LogInformation("RabbitMQ connection established");
+        return connection;
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning(ex, "Failed to connect to RabbitMQ. Service will start without message queue support.");
+        return null!;
+    }
 });
 
 // Infrastructure Services
@@ -105,8 +127,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseSerilogRequestLogging();
 
-
-app.MapControllers();
+// Map endpoints
+app.MapTransferEndpoints();
 
 // Health check endpoint
 app.MapHealthChecks("/health");

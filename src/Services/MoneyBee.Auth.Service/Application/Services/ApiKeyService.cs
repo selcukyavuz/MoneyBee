@@ -4,6 +4,7 @@ using MoneyBee.Auth.Service.Application.Interfaces;
 using MoneyBee.Auth.Service.Domain.Entities;
 using MoneyBee.Auth.Service.Domain.Interfaces;
 using MoneyBee.Auth.Service.Helpers;
+using MoneyBee.Common.Results;
 
 namespace MoneyBee.Auth.Service.Application.Services;
 
@@ -70,14 +71,14 @@ public class ApiKeyService : IApiKeyService
         });
     }
 
-    public async Task<ApiKeyDto?> GetApiKeyByIdAsync(Guid id)
+    public async Task<Result<ApiKeyDto>> GetApiKeyByIdAsync(Guid id)
     {
         var key = await _repository.GetByIdAsync(id);
 
         if (key == null)
-            return null;
+            return Result<ApiKeyDto>.Failure("API Key not found");
 
-        return new ApiKeyDto
+        return Result<ApiKeyDto>.Success(new ApiKeyDto
         {
             Id = key.Id,
             Name = key.Name,
@@ -87,15 +88,15 @@ public class ApiKeyService : IApiKeyService
             ExpiresAt = key.ExpiresAt,
             LastUsedAt = key.LastUsedAt,
             MaskedKey = ApiKeyHelper.MaskApiKey($"mb_{key.KeyHash.Substring(0, Math.Min(28, key.KeyHash.Length))}")
-        };
+        });
     }
 
-    public async Task<ApiKeyDto?> UpdateApiKeyAsync(Guid id, UpdateApiKeyRequest request)
+    public async Task<Result<ApiKeyDto>> UpdateApiKeyAsync(Guid id, UpdateApiKeyRequest request)
     {
         var key = await _repository.GetByIdAsync(id);
 
         if (key == null)
-            return null;
+            return Result<ApiKeyDto>.Failure("API Key not found");
 
         if (!string.IsNullOrWhiteSpace(request.Name))
             key.Name = request.Name;
@@ -110,7 +111,7 @@ public class ApiKeyService : IApiKeyService
 
         _logger.LogInformation("API Key updated: {KeyId}", id);
 
-        return new ApiKeyDto
+        return Result<ApiKeyDto>.Success(new ApiKeyDto
         {
             Id = updated.Id,
             Name = updated.Name,
@@ -120,15 +121,15 @@ public class ApiKeyService : IApiKeyService
             ExpiresAt = updated.ExpiresAt,
             LastUsedAt = updated.LastUsedAt,
             MaskedKey = ApiKeyHelper.MaskApiKey($"mb_{updated.KeyHash.Substring(0, Math.Min(28, updated.KeyHash.Length))}")
-        };
+        });
     }
 
-    public async Task<bool> DeleteApiKeyAsync(Guid id)
+    public async Task<Result> DeleteApiKeyAsync(Guid id)
     {
         var key = await _repository.GetByIdAsync(id);
 
         if (key == null)
-            return false;
+            return Result.Failure("API Key not found");
 
         var deleted = await _repository.DeleteAsync(id);
 
@@ -137,7 +138,7 @@ public class ApiKeyService : IApiKeyService
             _logger.LogWarning("API Key deleted: {KeyId} - {KeyName}", id, key.Name);
         }
 
-        return deleted;
+        return Result.Success();
     }
 
     public async Task<bool> ValidateApiKeyAsync(string apiKey)

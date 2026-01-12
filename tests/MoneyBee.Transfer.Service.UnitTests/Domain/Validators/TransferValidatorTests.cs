@@ -1,18 +1,12 @@
 using FluentAssertions;
 using MoneyBee.Common.Enums;
-using MoneyBee.Transfer.Service.Domain.Services;
+using MoneyBee.Transfer.Service.Domain.Validators;
 using TransferEntity = MoneyBee.Transfer.Service.Domain.Entities.Transfer;
 
-namespace MoneyBee.Transfer.Service.UnitTests.Domain.Services;
+namespace MoneyBee.Transfer.Service.UnitTests.Domain.Validators;
 
-public class TransferDomainServiceTests
+public class TransferValidatorTests
 {
-    private readonly TransferDomainService _domainService;
-
-    public TransferDomainServiceTests()
-    {
-        _domainService = new TransferDomainService();
-    }
 
     [Theory]
     [InlineData(500, false)]
@@ -24,7 +18,7 @@ public class TransferDomainServiceTests
     public void RequiresApprovalWait_WithVariousAmounts_ShouldReturnCorrectResult(decimal amount, bool expected)
     {
         // Act
-        var requiresApproval = _domainService.RequiresApprovalWait(amount);
+        var requiresApproval = TransferValidator.RequiresApprovalWait(amount);
 
         // Assert
         requiresApproval.Should().Be(expected);
@@ -38,7 +32,7 @@ public class TransferDomainServiceTests
         var beforeCalculation = DateTime.UtcNow;
 
         // Act
-        var approvalTime = _domainService.CalculateApprovalWaitTime(highAmount);
+        var approvalTime = TransferValidator.CalculateApprovalWaitTime(highAmount);
 
         // Assert
         approvalTime.Should().NotBeNull();
@@ -52,7 +46,7 @@ public class TransferDomainServiceTests
         var lowAmount = 500m;
 
         // Act
-        var approvalTime = _domainService.CalculateApprovalWaitTime(lowAmount);
+        var approvalTime = TransferValidator.CalculateApprovalWaitTime(lowAmount);
 
         // Assert
         approvalTime.Should().BeNull();
@@ -79,10 +73,10 @@ public class TransferDomainServiceTests
         );
 
         // Act
-        var act = () => _domainService.ValidateTransferForCompletion(transfer, "98765432109");
+        var result = TransferValidator.ValidateTransferForCompletion(transfer, "98765432109");
 
         // Assert
-        act.Should().NotThrow();
+        result.IsSuccess.Should().BeTrue();
     }
 
     [Fact]
@@ -108,11 +102,11 @@ public class TransferDomainServiceTests
         transfer.Complete();
 
         // Act
-        var act = () => _domainService.ValidateTransferForCompletion(transfer, "98765432109");
+        var result = TransferValidator.ValidateTransferForCompletion(transfer, "98765432109");
 
         // Assert
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("Transfer cannot be completed*");
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("Transfer cannot be completed");
     }
 
     [Fact]
@@ -136,11 +130,11 @@ public class TransferDomainServiceTests
         );
 
         // Act
-        var act = () => _domainService.ValidateTransferForCompletion(transfer, "11111111111");
+        var result = TransferValidator.ValidateTransferForCompletion(transfer, "11111111111");
 
         // Assert
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("Receiver identity verification failed");
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("Receiver identity verification failed");
     }
 
     [Fact]
@@ -152,10 +146,10 @@ public class TransferDomainServiceTests
         var dailyLimit = 10000m;
 
         // Act
-        var act = () => _domainService.ValidateDailyLimit(currentTotal, newAmount, dailyLimit);
+        var result = TransferValidator.ValidateDailyLimit(currentTotal, newAmount, dailyLimit);
 
         // Assert
-        act.Should().NotThrow();
+        result.IsSuccess.Should().BeTrue();
     }
 
     [Fact]
@@ -167,11 +161,11 @@ public class TransferDomainServiceTests
         var dailyLimit = 10000m;
 
         // Act
-        var act = () => _domainService.ValidateDailyLimit(currentTotal, newAmount, dailyLimit);
+        var result = TransferValidator.ValidateDailyLimit(currentTotal, newAmount, dailyLimit);
 
         // Assert
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("Daily transfer limit exceeded*");
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("Daily transfer limit exceeded");
     }
 
     [Fact]
@@ -183,10 +177,10 @@ public class TransferDomainServiceTests
         var dailyLimit = 10000m;
 
         // Act
-        var act = () => _domainService.ValidateDailyLimit(currentTotal, newAmount, dailyLimit);
+        var result = TransferValidator.ValidateDailyLimit(currentTotal, newAmount, dailyLimit);
 
         // Assert
-        act.Should().NotThrow();
+        result.IsSuccess.Should().BeTrue();
     }
 
     [Theory]
@@ -197,7 +191,7 @@ public class TransferDomainServiceTests
     public void ShouldRejectTransfer_WithVariousRiskLevels_ShouldReturnCorrectResult(RiskLevel? riskLevel, bool expected)
     {
         // Act
-        var shouldReject = _domainService.ShouldRejectTransfer(riskLevel);
+        var shouldReject = TransferValidator.ShouldRejectTransfer(riskLevel);
 
         // Assert
         shouldReject.Should().Be(expected);

@@ -1,11 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using MoneyBee.Customer.Service.Application.Interfaces;
 using MoneyBee.Customer.Service.Domain.Interfaces;
+using MoneyBee.Customer.Service.Endpoints;
 using MoneyBee.Customer.Service.Infrastructure.Data;
 using MoneyBee.Customer.Service.Infrastructure.ExternalServices;
 using MoneyBee.Customer.Service.Infrastructure.Messaging;
 using MoneyBee.Customer.Service.Infrastructure.Repositories;
 using MoneyBee.Customer.Service.BackgroundServices;
+using RabbitMQ.Client;
 using Serilog;
 
 // PostgreSQL timestamp compatibility
@@ -21,11 +23,10 @@ Log.Logger = new LoggerConfiguration()
 builder.Host.UseSerilog();
 
 // Add services to the container
-builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-    {
-        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
-    });
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -50,12 +51,34 @@ builder.Services.AddDbContext<CustomerDbContext>(options =>
 // HTTP Clients
 builder.Services.AddHttpClient("KycService");
 
+// RabbitMQ
+builder.Services.AddSingleton<IConnection>(sp =>
+{
+    var logger = sp.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        var factory = new ConnectionFactory()
+        {
+            HostName = builder.Configuration["RabbitMQ:Host"] ?? "localhost",
+            UserName = builder.Configuration["RabbitMQ:Username"] ?? "moneybee",
+            Password = builder.Configuration["RabbitMQ:Password"] ?? "moneybee123",
+            AutomaticRecoveryEnabled = true,
+            NetworkRecoveryInterval = TimeSpan.FromSeconds(10)
+        };
+        var connection = factory.CreateConnection();
+        logger.LogInformation("RabbitMQ connection established");
+        return connection;
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning(ex, "Failed to connect to RabbitMQ. Service will start without message queue support.");
+        return null!;
+    }
+});
+
 // Clean Architecture - Dependency Injection
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<ICustomerService, MoneyBee.Customer.Service.Application.Services.CustomerService>();
-
-// DDD - Domain Services
-builder.Services.AddScoped<MoneyBee.Customer.Service.Domain.Services.CustomerDomainService>();
 
 // Infrastructure Services
 builder.Services.AddScoped<IKycService, KycService>();
@@ -67,7 +90,7 @@ builder.Services.AddHostedService<KycRetryService>();
 // Health Checks
 builder.Services.AddHealthChecks()
     .AddNpgSql(builder.Configuration.GetConnectionString("DefaultConnection")!, name: "database")
-    .AddRabbitMQ(rabbitConnectionString: $"amqp://{builder.Configuration["RabbitMQ:Username"]}:{builder.Configuration["RabbitMQ:Password"]}@{builder.Configuration["RabbitMQ:Host"]}", name: "rabbitmq");
+    .AddRabbitMQ(name: "rabbitmq");
 
 var app = builder.Build();
 
@@ -95,8 +118,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseSerilogRequestLogging();
 
-
-app.MapControllers();
+// Map endpoints
+app.MapCustomerEndpoints();
 
 // Health check endpoint
 app.MapHealthChecks("/health");
