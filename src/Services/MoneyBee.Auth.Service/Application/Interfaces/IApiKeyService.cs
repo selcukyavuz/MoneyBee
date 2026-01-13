@@ -16,32 +16,16 @@ public interface IApiKeyService
     Task<CreateApiKeyResponse> CreateApiKeyAsync(CreateApiKeyRequest request);
     
     /// <summary>
-    /// Gets all API keys in the system
+    /// Validates an API key by checking if it exists and is active
     /// </summary>
-    /// <returns>Collection of API key DTOs</returns>
-    Task<IEnumerable<ApiKeyDto>> GetAllApiKeysAsync();
-    
-    /// <summary>
-    /// Gets an API key by its unique identifier
-    /// </summary>
-    /// <param name="id">The unique identifier of the API key</param>
-    /// <returns>Result containing the API key DTO if found</returns>
-    Task<Result<ApiKeyDto>> GetApiKeyByIdAsync(Guid id);
-    
-    /// <summary>
-    /// Updates an existing API key
-    /// </summary>
-    /// <param name="id">The unique identifier of the API key</param>
-    /// <param name="request">The update request containing new values</param>
-    /// <returns>Result containing the updated API key DTO</returns>
-    Task<Result<ApiKeyDto>> UpdateApiKeyAsync(Guid id, UpdateApiKeyRequest request);
-    
-    /// <summary>
-    /// Deletes an API key from the system
-    /// </summary>
-    /// <param name="id">The unique identifier of the API key to delete</param>
-    /// <returns>Result indicating success or failure</returns>
-    Task<Result> DeleteApiKeyAsync(Guid id);
+    /// <param name="apiKey">The API key string to validate</param>
+    /// <returns>True if the API key is valid and active; otherwise, false</returns>
     Task<bool> ValidateApiKeyAsync(string apiKey);
+    
+    /// <summary>
+    /// Updates the last used timestamp for an API key
+    /// </summary>
+    /// <param name="apiKey">The API key string whose last used timestamp should be updated</param>
+    /// <returns>A task representing the asynchronous operation</returns>
     Task UpdateLastUsedAsync(string apiKey);
 }

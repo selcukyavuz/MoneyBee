@@ -15,11 +15,6 @@ public static class ApiKeyEndpoints
             .WithOpenApi();
 
         group.MapCreateApiKey();
-        group.MapGetAllApiKeys();
-        group.MapGetApiKey();
-        group.MapUpdateApiKey();
-        group.MapDeleteApiKey();
-        group.MapValidateApiKey();
 
         return group;
     }
