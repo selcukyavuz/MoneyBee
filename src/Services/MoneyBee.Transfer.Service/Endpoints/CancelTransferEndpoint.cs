@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using MoneyBee.Common.Models;
 using MoneyBee.Transfer.Service.Application.DTOs;
 using MoneyBee.Transfer.Service.Application.Interfaces;
+using MoneyBee.Transfer.Service.Extensions;
 
 namespace MoneyBee.Transfer.Service.Endpoints;
 
@@ -33,7 +34,7 @@ public static class CancelTransferEndpoint
             var result = await transferService.CancelTransferAsync(code, request);
 
             if (!result.IsSuccess)
-                return Results.BadRequest(ApiResponse<TransferDto>.ErrorResponse(result.Error!));
+                return result.ToHttpResult();
 
             return Results.Ok(ApiResponse<TransferDto>.SuccessResponse(result.Value!, "Transfer cancelled. Fee will be refunded."));
         }

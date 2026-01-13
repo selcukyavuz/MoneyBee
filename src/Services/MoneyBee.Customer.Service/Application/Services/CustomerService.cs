@@ -24,7 +24,7 @@ public class CustomerService(
         var existingCustomer = await repository.GetByNationalIdAsync(request.NationalId);
         if (existingCustomer is not null)
         {
-            return Result<CustomerDto>.Failure(ErrorMessages.Customer.AlreadyExists);
+            return Result<CustomerDto>.Conflict(ErrorMessages.Customer.AlreadyExists);
         }
 
         // Create customer aggregate using factory method
@@ -43,7 +43,7 @@ public class CustomerService(
         var validationResult = CustomerValidator.ValidateCustomerForCreation(customer);
         if (!validationResult.IsSuccess)
         {
-            return Result<CustomerDto>.Failure(validationResult.Error!);
+            return Result<CustomerDto>.Validation(validationResult.Error!);
         }
 
         // Perform KYC verification (non-blocking)
@@ -99,7 +99,7 @@ public class CustomerService(
         
         if (customer is null)
         {
-            return Result<CustomerDto>.Failure(ErrorMessages.Customer.NotFound);
+            return Result<CustomerDto>.NotFound(ErrorMessages.Customer.NotFound);
         }
         
         return Result<CustomerDto>.Success(MapToDto(customer));
@@ -111,7 +111,7 @@ public class CustomerService(
         
         if (customer is null)
         {
-            return Result<CustomerDto>.Failure(ErrorMessages.Customer.NotFound);
+            return Result<CustomerDto>.NotFound(ErrorMessages.Customer.NotFound);
         }
         
         return Result<CustomerDto>.Success(MapToDto(customer));
@@ -123,7 +123,7 @@ public class CustomerService(
 
         if (customer is null)
         {
-            return Result<CustomerDto>.Failure(ErrorMessages.Customer.NotFound);
+            return Result<CustomerDto>.NotFound(ErrorMessages.Customer.NotFound);
         }
 
         // Use aggregate method to update information
@@ -147,14 +147,14 @@ public class CustomerService(
 
         if (customer is null)
         {
-            return Result.Failure(ErrorMessages.Customer.NotFound);
+            return Result.NotFound(ErrorMessages.Customer.NotFound);
         }
 
         var validationResult = CustomerValidator.ValidateCustomerUpdate(customer, request.Status);
         
         if (!validationResult.IsSuccess)
         {
-            return Result.Failure(validationResult.Error!);
+            return Result.Validation(validationResult.Error!);
         }
 
         // Capture old status before update for event

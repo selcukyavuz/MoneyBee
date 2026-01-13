@@ -195,6 +195,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// Global exception handling - must be first
+app.UseMiddleware<MoneyBee.Common.Middleware.GlobalExceptionHandlerMiddleware>();
+
 app.UseSerilogRequestLogging();
 
 // API Key Authentication

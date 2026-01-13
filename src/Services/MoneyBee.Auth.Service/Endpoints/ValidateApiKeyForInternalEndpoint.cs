@@ -16,9 +16,13 @@ public static class ValidateApiKeyEndpoint
                 return Results.BadRequest(new { error = "API Key is required" });
             }
 
-            var isValid = await apiKeyService.ValidateApiKeyAsync(request.ApiKey);
+            var result = await apiKeyService.ValidateApiKeyAsync(request.ApiKey);
             
-            return Results.Ok(new ValidateResponse { IsValid = isValid });
+            return Results.Ok(new ValidateResponse 
+            { 
+                IsValid = result.IsSuccess && result.Value,
+                Error = result.IsSuccess ? null : result.Error
+            });
         })
         .WithName("ValidateApiKeyInternal")
         .WithDescription("Internal endpoint for API key validation by other services")
@@ -29,5 +33,6 @@ public static class ValidateApiKeyEndpoint
     public record ValidateResponse
     {
         public bool IsValid { get; set; }
+        public string? Error { get; set; }
     }
 }

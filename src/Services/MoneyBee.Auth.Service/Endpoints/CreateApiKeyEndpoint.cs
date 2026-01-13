@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using MoneyBee.Auth.Service.Application.DTOs;
 using MoneyBee.Auth.Service.Application.Interfaces;
+using MoneyBee.Auth.Service.Extensions;
 using MoneyBee.Common.Models;
 
 namespace MoneyBee.Auth.Service.Endpoints;
@@ -25,10 +26,13 @@ public static class CreateApiKeyEndpoint
         [FromBody] CreateApiKeyRequest request,
         IApiKeyService apiKeyService)
     {
-        var response = await apiKeyService.CreateApiKeyAsync(request);
+        var result = await apiKeyService.CreateApiKeyAsync(request);
+
+        if (!result.IsSuccess)
+            return result.ToHttpResult();
 
         return Results.Created(
-            $"/api/auth/keys/{response.Id}",
-            ApiResponse<CreateApiKeyResponse>.SuccessResponse(response, "API Key created successfully"));
+            $"/api/auth/keys/{result.Value!.Id}",
+            ApiResponse<CreateApiKeyResponse>.SuccessResponse(result.Value, "API Key created successfully"));
     }
 }

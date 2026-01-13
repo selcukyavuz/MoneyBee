@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Options;
 using MoneyBee.Common.Enums;
-using MoneyBee.Common.Exceptions;
 using MoneyBee.Common.Results;
 using MoneyBee.Common.Services;
 using MoneyBee.Transfer.Service.Application.Constants;
@@ -30,7 +29,7 @@ public class TransferValidationService(
     {
         if (string.IsNullOrWhiteSpace(idempotencyKey))
         {
-            return Result<CreateTransferResponse>.Failure(TransferErrors.IdempotencyKeyRequired);
+            return Result<CreateTransferResponse>.Validation(TransferErrors.IdempotencyKeyRequired);
         }
 
         var existingTransfer = await repository.GetByIdempotencyKeyAsync(idempotencyKey);

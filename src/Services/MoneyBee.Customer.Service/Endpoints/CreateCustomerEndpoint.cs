@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using MoneyBee.Common.Models;
 using MoneyBee.Customer.Service.Application.DTOs;
 using MoneyBee.Customer.Service.Application.Interfaces;
+using MoneyBee.Customer.Service.Extensions;
 
 namespace MoneyBee.Customer.Service.Endpoints;
 
@@ -28,7 +29,7 @@ public static class CreateCustomerEndpoint
         var result = await customerService.CreateCustomerAsync(request);
 
         if (!result.IsSuccess)
-            return Results.BadRequest(ApiResponse<CustomerDto>.ErrorResponse(result.Error!));
+            return result.ToHttpResult();
 
         return Results.Created(
             $"/api/customers/{result.Value!.Id}",

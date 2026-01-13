@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using MoneyBee.Common.Models;
 using MoneyBee.Customer.Service.Application.DTOs;
 using MoneyBee.Customer.Service.Application.Interfaces;
+using MoneyBee.Customer.Service.Extensions;
 
 namespace MoneyBee.Customer.Service.Endpoints;
 
@@ -29,7 +30,7 @@ public static class UpdateCustomerEndpoint
         var result = await customerService.UpdateCustomerAsync(id, request);
 
         if (!result.IsSuccess)
-            return Results.NotFound(ApiResponse<CustomerDto>.ErrorResponse(result.Error!));
+            return result.ToHttpResult();
 
         return Results.Ok(ApiResponse<CustomerDto>.SuccessResponse(result.Value!, "Customer updated successfully"));
     }

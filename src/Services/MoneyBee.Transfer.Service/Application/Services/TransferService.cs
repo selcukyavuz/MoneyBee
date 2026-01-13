@@ -45,7 +45,7 @@ public class TransferService(
         // Validate amount
         if (request.Amount <= 0)
         {
-            return Result<CreateTransferResponse>.Failure(TransferErrors.AmountMustBePositive);
+            return Result<CreateTransferResponse>.Validation(TransferErrors.AmountMustBePositive);
         }
 
         // Validate sender
@@ -156,7 +156,7 @@ public class TransferService(
 
         if (transfer is null)
         {
-            return Result<TransferDto>.Failure(TransferErrors.TransferNotFound);
+            return Result<TransferDto>.NotFound(TransferErrors.TransferNotFound);
         }
 
         // Use domain service for validation

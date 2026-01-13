@@ -13,7 +13,7 @@ public class ApiKeyService(
     ILogger<ApiKeyService> logger) : IApiKeyService
 {
 
-    public async Task<CreateApiKeyResponse> CreateApiKeyAsync(CreateApiKeyRequest request)
+    public async Task<Result<CreateApiKeyResponse>> CreateApiKeyAsync(CreateApiKeyRequest request)
     {
         var apiKey = ApiKeyHelper.GenerateApiKey();
         var keyHash = ApiKeyHelper.HashApiKey(apiKey);
@@ -35,7 +35,7 @@ public class ApiKeyService(
 
         logger.LogInformation("API Key created: {KeyId} - {KeyName}", created.Id, created.Name);
 
-        return new CreateApiKeyResponse
+        var response = new CreateApiKeyResponse
         {
             Id = created.Id,
             Name = created.Name,
@@ -44,41 +44,62 @@ public class ApiKeyService(
             CreatedAt = created.CreatedAt,
             ExpiresAt = created.ExpiresAt
         };
+
+        return Result<CreateApiKeyResponse>.Success(response);
     }
 
-    public async Task<bool> ValidateApiKeyAsync(string apiKey)
+    public async Task<Result<bool>> ValidateApiKeyAsync(string apiKey)
     {
-        if (string.IsNullOrWhiteSpace(apiKey) || !ApiKeyHelper.IsValidApiKeyFormat(apiKey))
+        if (string.IsNullOrWhiteSpace(apiKey))
         {
-            return false;
+            return Result<bool>.Validation(ErrorMessages.ApiKey.CannotBeEmpty);
+        }
+
+        if (!ApiKeyHelper.IsValidApiKeyFormat(apiKey))
+        {
+            return Result<bool>.Validation(ErrorMessages.ApiKey.InvalidFormat);
         }
 
         var keyHash = ApiKeyHelper.HashApiKey(apiKey);
-        
         var key = await repository.GetByKeyHashAsync(keyHash);
 
-        if (key is null || !key.IsActive)
+        if (key is null)
         {
-            return false;
+            return Result<bool>.NotFound(ErrorMessages.ApiKey.NotFound);
+        }
+
+        if (!key.IsActive)
+        {
+            return Result<bool>.Unauthorized(ErrorMessages.ApiKey.Inactive);
         }
 
         if (key.ExpiresAt.HasValue && key.ExpiresAt.Value <= DateTime.UtcNow)
         {
-            return false;
+            return Result<bool>.Unauthorized(ErrorMessages.ApiKey.Expired);
         }
 
-        return true;
+        return Result<bool>.Success(true);
     }
 
-    public async Task UpdateLastUsedAsync(string apiKey)
+    public async Task<Result> UpdateLastUsedAsync(string apiKey)
     {
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            return Result.Validation(ErrorMessages.ApiKey.CannotBeEmpty);
+        }
+
         var keyHash = ApiKeyHelper.HashApiKey(apiKey);
         var key = await repository.GetByKeyHashAsync(keyHash);
 
-        if (key is not null)
+        if (key is null)
         {
-            key.LastUsedAt = DateTime.UtcNow;
-            await repository.UpdateAsync(key);
+            return Result.NotFound(ErrorMessages.ApiKey.NotFound);
         }
+
+        key.LastUsedAt = DateTime.UtcNow;
+        await repository.UpdateAsync(key);
+
+        logger.LogDebug("API Key last used timestamp updated: {KeyId}", key.Id);
+        return Result.Success();
     }
 }

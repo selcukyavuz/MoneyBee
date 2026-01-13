@@ -16,7 +16,7 @@ public static class CustomerValidator
             return Result.Failure(ErrorMessages.Customer.MustBeAdult);
 
         if (customer.CustomerType == CustomerType.Corporate && string.IsNullOrWhiteSpace(customer.TaxNumber))
-            return Result.Failure(ErrorMessages.Customer.CorporateMustHaveTaxNumber);
+            return Result.Validation(ErrorMessages.Customer.CorporateMustHaveTaxNumber);
 
         return Result.Success();
     }
@@ -36,7 +36,7 @@ public static class CustomerValidator
         if (customer.Status == CustomerStatus.Blocked && newStatus == CustomerStatus.Active)
         {
             if (!customer.KycVerified)
-                return Result.Failure(ErrorMessages.Customer.CannotActivateBlockedWithoutKyc);
+                return Result.Validation(ErrorMessages.Customer.CannotActivateBlockedWithoutKyc);
         }
 
         return Result.Success();

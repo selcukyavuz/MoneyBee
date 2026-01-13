@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using MoneyBee.Common.Models;
 using MoneyBee.Transfer.Service.Application.DTOs;
 using MoneyBee.Transfer.Service.Application.Interfaces;
+using MoneyBee.Transfer.Service.Extensions;
 
 namespace MoneyBee.Transfer.Service.Endpoints;
 
@@ -33,7 +34,7 @@ public static class CreateTransferEndpoint
             var result = await transferService.CreateTransferAsync(request, cancellationToken);
 
             if (!result.IsSuccess)
-                return Results.BadRequest(ApiResponse<CreateTransferResponse>.ErrorResponse(result.Error!));
+                return result.ToHttpResult();
 
             var response = result.Value!;
             return Results.Created(

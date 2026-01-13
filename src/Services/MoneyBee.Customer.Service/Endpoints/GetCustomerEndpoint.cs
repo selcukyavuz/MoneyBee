@@ -1,6 +1,7 @@
 using MoneyBee.Common.Models;
 using MoneyBee.Customer.Service.Application.DTOs;
 using MoneyBee.Customer.Service.Application.Interfaces;
+using MoneyBee.Customer.Service.Extensions;
 
 namespace MoneyBee.Customer.Service.Endpoints;
 
@@ -25,10 +26,6 @@ public static class GetCustomerEndpoint
         ICustomerService customerService)
     {
         var result = await customerService.GetCustomerByIdAsync(id);
-
-        if (!result.IsSuccess)
-            return Results.NotFound(ApiResponse<CustomerDto>.ErrorResponse(result.Error!));
-
-        return Results.Ok(ApiResponse<CustomerDto>.SuccessResponse(result.Value!));
+        return result.ToHttpResult();
     }
 }

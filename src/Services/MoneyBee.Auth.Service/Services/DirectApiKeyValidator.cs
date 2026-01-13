@@ -20,6 +20,7 @@ public class DirectApiKeyValidator : IApiKeyValidator
     /// </summary>
     public async Task<bool> ValidateApiKeyAsync(string apiKey)
     {
-        return await _apiKeyService.ValidateApiKeyAsync(apiKey);
+        var result = await _apiKeyService.ValidateApiKeyAsync(apiKey);
+        return result.IsSuccess && result.Value;
     }
 }

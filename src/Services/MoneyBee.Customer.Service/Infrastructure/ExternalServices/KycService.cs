@@ -1,4 +1,3 @@
-using MoneyBee.Common.Exceptions;
 using Polly;
 using Polly.CircuitBreaker;
 using System.Text.Json;

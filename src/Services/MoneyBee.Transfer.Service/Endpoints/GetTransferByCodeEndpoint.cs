@@ -1,6 +1,7 @@
 using MoneyBee.Common.Models;
 using MoneyBee.Transfer.Service.Application.DTOs;
 using MoneyBee.Transfer.Service.Application.Interfaces;
+using MoneyBee.Transfer.Service.Extensions;
 
 namespace MoneyBee.Transfer.Service.Endpoints;
 
@@ -25,10 +26,6 @@ public static class GetTransferByCodeEndpoint
         ITransferService transferService)
     {
         var result = await transferService.GetTransferByCodeAsync(code);
-
-        if (!result.IsSuccess)
-            return Results.NotFound(ApiResponse<TransferDto>.ErrorResponse(result.Error!));
-
-        return Results.Ok(ApiResponse<TransferDto>.SuccessResponse(result.Value!));
+        return result.ToHttpResult();
     }
 }

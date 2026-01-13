@@ -49,13 +49,14 @@ public class ApiKeyAuthenticationMiddleware
         }
 
         // Validate API Key using service
-        var isValid = await apiKeyService.ValidateApiKeyAsync(apiKey);
+        var validationResult = await apiKeyService.ValidateApiKeyAsync(apiKey);
 
-        if (!isValid)
+        if (!validationResult.IsSuccess || !validationResult.Value)
         {
-            _logger.LogWarning("Invalid API Key attempt from {IpAddress}", context.Connection.RemoteIpAddress);
+            _logger.LogWarning("Invalid API Key attempt from {IpAddress}: {Error}", 
+                context.Connection.RemoteIpAddress, validationResult.Error ?? "Validation failed");
             context.Response.StatusCode = 401;
-            await context.Response.WriteAsJsonAsync(new { error = "Invalid or expired API Key" });
+            await context.Response.WriteAsJsonAsync(new { error = validationResult.Error ?? "Invalid or expired API Key" });
             return;
         }
 

@@ -8,6 +8,7 @@ public static class ErrorMessages
     public static class Customer
     {
         public const string NotFound = "Customer not found";
+        public const string ServiceUnavailable = "Customer service is temporarily unavailable";
     }
 
     public static class Transfer
