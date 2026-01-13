@@ -15,11 +15,12 @@ namespace MoneyBee.IntegrationTests.E2E;
 [Collection("CompleteTransferFlowTests")]
 public class CompleteTransferFlowTests : IClassFixture<IntegrationTestFactory<CustomerProgram>>
 {
-    private readonly HttpClient _client;
+    private readonly IntegrationTestFactory<CustomerProgram> _factory;
+    private HttpClient Client => _factory.CreateAuthenticatedClient();
 
     public CompleteTransferFlowTests(IntegrationTestFactory<CustomerProgram> factory)
     {
-        _client = factory.CreateClient();
+        _factory = factory;
     }
 
     [Fact]
@@ -39,7 +40,7 @@ public class CompleteTransferFlowTests : IClassFixture<IntegrationTestFactory<Cu
         };
 
         // Act - Create sender
-        var senderResponse = await _client.PostAsJsonAsync("/api/customers", sender);
+        var senderResponse = await Client.PostAsJsonAsync("/api/customers", sender);
 
         // Assert
         senderResponse.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -61,7 +62,7 @@ public class CompleteTransferFlowTests : IClassFixture<IntegrationTestFactory<Cu
         };
 
         // Act - Create receiver
-        var receiverResponse = await _client.PostAsJsonAsync("/api/customers", receiver);
+        var receiverResponse = await Client.PostAsJsonAsync("/api/customers", receiver);
 
         // Assert
         receiverResponse.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -87,7 +88,7 @@ public class CompleteTransferFlowTests : IClassFixture<IntegrationTestFactory<Cu
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/customers", customer);
+        var response = await Client.PostAsJsonAsync("/api/customers", customer);
 
         // Assert - Customer created successfully
         response.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -129,11 +130,11 @@ public class CompleteTransferFlowTests : IClassFixture<IntegrationTestFactory<Cu
             address = "Address 2"
         };
 
-        await _client.PostAsJsonAsync("/api/customers", customer1);
-        await _client.PostAsJsonAsync("/api/customers", customer2);
+        await Client.PostAsJsonAsync("/api/customers", customer1);
+        await Client.PostAsJsonAsync("/api/customers", customer2);
 
         // Act
-        var response = await _client.GetAsync("/api/customers?pageNumber=1&pageSize=10");
+        var response = await Client.GetAsync("/api/customers?pageNumber=1&pageSize=10");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -157,13 +158,13 @@ public class CompleteTransferFlowTests : IClassFixture<IntegrationTestFactory<Cu
         };
 
         // Act
-        var response = await _client.PutAsJsonAsync($"/api/customers/{customerId}", updateRequest);
+        var response = await Client.PutAsJsonAsync($"/api/customers/{customerId}", updateRequest);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
         // Verify update
-        var getResponse = await _client.GetAsync($"/api/customers/{customerId}");
+        var getResponse = await Client.GetAsync($"/api/customers/{customerId}");
         var result = await getResponse.Content.ReadFromJsonAsync<ApiResponse>();
         var customer = System.Text.Json.JsonSerializer.Deserialize<CustomerDto>(
             System.Text.Json.JsonSerializer.Serialize(result!.Data),
@@ -186,7 +187,7 @@ public class CompleteTransferFlowTests : IClassFixture<IntegrationTestFactory<Cu
         };
 
         // Act - Block customer
-        var blockResponse = await _client.PatchAsJsonAsync(
+        var blockResponse = await Client.PatchAsJsonAsync(
             $"/api/customers/{customerId}/status", 
             statusRequest);
 
@@ -194,7 +195,7 @@ public class CompleteTransferFlowTests : IClassFixture<IntegrationTestFactory<Cu
         blockResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Verify blocked status
-        var getResponse = await _client.GetAsync($"/api/customers/{customerId}");
+        var getResponse = await Client.GetAsync($"/api/customers/{customerId}");
         var result = await getResponse.Content.ReadFromJsonAsync<ApiResponse>();
         var customer = System.Text.Json.JsonSerializer.Deserialize<CustomerDto>(
             System.Text.Json.JsonSerializer.Serialize(result!.Data),
@@ -253,7 +254,7 @@ public class CompleteTransferFlowTests : IClassFixture<IntegrationTestFactory<Cu
             address = "Test Street 123, Istanbul, Turkey 34000"
         };
 
-        var response = await _client.PostAsJsonAsync("/api/customers", request);
+        var response = await Client.PostAsJsonAsync("/api/customers", request);
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<ApiResponse>();

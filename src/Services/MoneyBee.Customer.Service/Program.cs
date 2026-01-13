@@ -48,8 +48,23 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddDbContext<CustomerDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Redis Cache for API Key validation
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
+    options.InstanceName = "CustomerService:";
+});
+
 // HTTP Clients
 builder.Services.AddHttpClient("KycService");
+
+// Auth Service HTTP Client for API key validation
+builder.Services.AddHttpClient<MoneyBee.Common.Services.IApiKeyValidator, MoneyBee.Common.Services.CachedApiKeyValidator>(client =>
+{
+    var authServiceUrl = builder.Configuration["Services:AuthService:Url"] ?? "http://localhost:5001";
+    client.BaseAddress = new Uri(authServiceUrl);
+    client.Timeout = TimeSpan.FromSeconds(5);
+});
 
 // RabbitMQ
 builder.Services.AddSingleton<IConnection>(sp =>
@@ -117,6 +132,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseSerilogRequestLogging();
+
+// API Key Authentication
+app.UseMiddleware<MoneyBee.Common.Middleware.ApiKeyAuthenticationMiddleware>();
 
 // Map endpoints
 app.MapCustomerEndpoints();

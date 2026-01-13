@@ -105,6 +105,14 @@ builder.Services.AddHttpClient<IExchangeRateService, ExchangeRateService>((sp, c
     .HandleTransientHttpError()
     .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))));
 
+// Auth Service HTTP Client for API key validation
+builder.Services.AddHttpClient<MoneyBee.Common.Services.IApiKeyValidator, MoneyBee.Common.Services.CachedApiKeyValidator>(client =>
+{
+    var authServiceUrl = builder.Configuration["Services:AuthService:Url"] ?? "http://localhost:5001";
+    client.BaseAddress = new Uri(authServiceUrl);
+    client.Timeout = TimeSpan.FromSeconds(5);
+});
+
 // Services
 builder.Services.AddScoped<MoneyBee.Transfer.Service.Domain.Interfaces.ITransferRepository, MoneyBee.Transfer.Service.Infrastructure.Repositories.TransferRepository>();
 builder.Services.AddScoped<MoneyBee.Transfer.Service.Application.Interfaces.ITransferService, MoneyBee.Transfer.Service.Application.Services.TransferService>();
@@ -118,6 +126,13 @@ var redisConfig = ConfigurationOptions.Parse(builder.Configuration["Redis:Connec
 redisConfig.AbortOnConnectFail = false;
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     ConnectionMultiplexer.Connect(redisConfig));
+
+// Redis Cache for API Key validation
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379";
+    options.InstanceName = "TransferService:";
+});
 
 // RabbitMQ
 builder.Services.AddSingleton<IConnection>(sp =>
@@ -181,6 +196,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseSerilogRequestLogging();
+
+// API Key Authentication
+app.UseMiddleware<MoneyBee.Common.Middleware.ApiKeyAuthenticationMiddleware>();
 
 // Map endpoints
 app.MapTransferEndpoints();

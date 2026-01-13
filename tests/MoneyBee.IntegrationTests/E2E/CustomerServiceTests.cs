@@ -16,11 +16,12 @@ namespace MoneyBee.IntegrationTests.E2E;
 [Collection("CustomerServiceTests")] // Run tests sequentially to avoid database conflicts
 public class CustomerServiceTests : IClassFixture<IntegrationTestFactory<CustomerProgram>>
 {
-    private readonly HttpClient _client;
+    private readonly IntegrationTestFactory<CustomerProgram> _factory;
+    private HttpClient Client => _factory.CreateAuthenticatedClient();
 
     public CustomerServiceTests(IntegrationTestFactory<CustomerProgram> factory)
     {
-        _client = factory.CreateClient();
+        _factory = factory;
     }
 
     [Fact]
@@ -40,7 +41,7 @@ public class CustomerServiceTests : IClassFixture<IntegrationTestFactory<Custome
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/customers", request);
+        var response = await Client.PostAsJsonAsync("/api/customers", request);
 
         // Assert
         if (response.StatusCode != HttpStatusCode.Created)
@@ -75,7 +76,7 @@ public class CustomerServiceTests : IClassFixture<IntegrationTestFactory<Custome
         var customerId = await CreateTestCustomerAsync();
 
         // Act
-        var response = await _client.GetAsync($"/api/customers/{customerId}");
+        var response = await Client.GetAsync($"/api/customers/{customerId}");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -107,7 +108,7 @@ public class CustomerServiceTests : IClassFixture<IntegrationTestFactory<Custome
         };
 
         // Act
-        var response = await _client.PutAsJsonAsync($"/api/customers/{customerId}", updateRequest);
+        var response = await Client.PutAsJsonAsync($"/api/customers/{customerId}", updateRequest);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -138,13 +139,13 @@ public class CustomerServiceTests : IClassFixture<IntegrationTestFactory<Custome
         };
 
         // Act
-        var response = await _client.PatchAsJsonAsync($"/api/customers/{customerId}/status", statusRequest);
+        var response = await Client.PatchAsJsonAsync($"/api/customers/{customerId}/status", statusRequest);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Verify status changed
-        var getResponse = await _client.GetAsync($"/api/customers/{customerId}");
+        var getResponse = await Client.GetAsync($"/api/customers/{customerId}");
         var result = await getResponse.Content.ReadFromJsonAsync<ApiResponse>();
         result.Should().NotBeNull();
         
@@ -162,13 +163,13 @@ public class CustomerServiceTests : IClassFixture<IntegrationTestFactory<Custome
         var customerId = await CreateTestCustomerAsync();
 
         // Act
-        var response = await _client.DeleteAsync($"/api/customers/{customerId}");
+        var response = await Client.DeleteAsync($"/api/customers/{customerId}");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Verify customer is deleted
-        var getResponse = await _client.GetAsync($"/api/customers/{customerId}");
+        var getResponse = await Client.GetAsync($"/api/customers/{customerId}");
         getResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -180,7 +181,7 @@ public class CustomerServiceTests : IClassFixture<IntegrationTestFactory<Custome
         await CreateTestCustomerAsync();
 
         // Act
-        var response = await _client.GetAsync("/api/customers?pageNumber=1&pageSize=10");
+        var response = await Client.GetAsync("/api/customers?pageNumber=1&pageSize=10");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -213,7 +214,7 @@ public class CustomerServiceTests : IClassFixture<IntegrationTestFactory<Custome
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/customers", request);
+        var response = await Client.PostAsJsonAsync("/api/customers", request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -226,7 +227,7 @@ public class CustomerServiceTests : IClassFixture<IntegrationTestFactory<Custome
         var nonExistentId = Guid.NewGuid();
 
         // Act
-        var response = await _client.GetAsync($"/api/customers/{nonExistentId}");
+        var response = await Client.GetAsync($"/api/customers/{nonExistentId}");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -285,7 +286,7 @@ public class CustomerServiceTests : IClassFixture<IntegrationTestFactory<Custome
             address = "Test Street 123, Istanbul, Turkey 34000"
         };
 
-        var response = await _client.PostAsJsonAsync("/api/customers", request);
+        var response = await Client.PostAsJsonAsync("/api/customers", request);
         
         if (!response.IsSuccessStatusCode)
         {

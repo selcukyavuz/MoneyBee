@@ -15,6 +15,9 @@ public static class ApiKeyEndpoints
             .WithOpenApi();
 
         group.MapCreateApiKey();
+        
+        // Internal validation endpoint (not in group path)
+        routes.MapValidateApiKeyForInternal();
 
         return group;
     }

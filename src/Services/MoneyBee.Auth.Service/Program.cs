@@ -8,6 +8,7 @@ using MoneyBee.Auth.Service.Infrastructure.Data;
 using MoneyBee.Auth.Service.Infrastructure.Repositories;
 using MoneyBee.Auth.Service.Middleware;
 using MoneyBee.Auth.Service.Services;
+using MoneyBee.Common.Services;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Serilog;
@@ -77,6 +78,9 @@ builder.Services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
 builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
 builder.Services.AddScoped<IRateLimitService, RateLimitService>();
 
+// API Key Validator (direct DB access for Auth Service)
+builder.Services.AddScoped<IApiKeyValidator, DirectApiKeyValidator>();
+
 // FluentValidation
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateApiKeyValidator>();
@@ -113,7 +117,7 @@ app.UseSerilogRequestLogging();
 
 
 // Custom Middleware
-app.UseMiddleware<ApiKeyAuthenticationMiddleware>();
+app.UseMiddleware<MoneyBee.Common.Middleware.ApiKeyAuthenticationMiddleware>();
 app.UseMiddleware<RateLimitMiddleware>();
 
 // Map endpoints
