@@ -94,7 +94,7 @@ public class CompleteTransferFlowTests : IClassFixture<IntegrationTestFactory<Cu
         
         var result = await response.Content.ReadFromJsonAsync<ApiResponse>();
         var createdCustomer = System.Text.Json.JsonSerializer.Deserialize<CustomerDto>(
-            result!.Data.ToString()!,
+            System.Text.Json.JsonSerializer.Serialize(result!.Data),
             new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         createdCustomer.Should().NotBeNull();
@@ -166,7 +166,7 @@ public class CompleteTransferFlowTests : IClassFixture<IntegrationTestFactory<Cu
         var getResponse = await _client.GetAsync($"/api/customers/{customerId}");
         var result = await getResponse.Content.ReadFromJsonAsync<ApiResponse>();
         var customer = System.Text.Json.JsonSerializer.Deserialize<CustomerDto>(
-            result!.Data.ToString()!,
+            System.Text.Json.JsonSerializer.Serialize(result!.Data),
             new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         customer!.FirstName.Should().Be("Updated");
@@ -197,7 +197,7 @@ public class CompleteTransferFlowTests : IClassFixture<IntegrationTestFactory<Cu
         var getResponse = await _client.GetAsync($"/api/customers/{customerId}");
         var result = await getResponse.Content.ReadFromJsonAsync<ApiResponse>();
         var customer = System.Text.Json.JsonSerializer.Deserialize<CustomerDto>(
-            result!.Data.ToString()!,
+            System.Text.Json.JsonSerializer.Serialize(result!.Data),
             new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         customer!.Status.Should().Be("Blocked"); // Blocked
@@ -258,7 +258,7 @@ public class CompleteTransferFlowTests : IClassFixture<IntegrationTestFactory<Cu
 
         var result = await response.Content.ReadFromJsonAsync<ApiResponse>();
         var customer = System.Text.Json.JsonSerializer.Deserialize<CustomerDto>(
-            result!.Data.ToString()!,
+            System.Text.Json.JsonSerializer.Serialize(result!.Data),
             new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         return customer!.Id;

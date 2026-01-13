@@ -57,7 +57,7 @@ public class CustomerServiceTests : IClassFixture<IntegrationTestFactory<Custome
         result.Data.Should().NotBeNull();
 
         var customer = System.Text.Json.JsonSerializer.Deserialize<CustomerDto>(
-            result.Data.ToString()!,
+            System.Text.Json.JsonSerializer.Serialize(result.Data),
             new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         customer.Should().NotBeNull();
@@ -85,7 +85,7 @@ public class CustomerServiceTests : IClassFixture<IntegrationTestFactory<Custome
         result!.Success.Should().BeTrue();
 
         var customer = System.Text.Json.JsonSerializer.Deserialize<CustomerDto>(
-            result.Data.ToString()!,
+            System.Text.Json.JsonSerializer.Serialize(result.Data),
             new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         customer.Should().NotBeNull();
@@ -117,7 +117,7 @@ public class CustomerServiceTests : IClassFixture<IntegrationTestFactory<Custome
         result!.Success.Should().BeTrue();
 
         var customer = System.Text.Json.JsonSerializer.Deserialize<CustomerDto>(
-            result.Data.ToString()!,
+            System.Text.Json.JsonSerializer.Serialize(result.Data),
             new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         customer.Should().NotBeNull();
@@ -146,9 +146,10 @@ public class CustomerServiceTests : IClassFixture<IntegrationTestFactory<Custome
         // Verify status changed
         var getResponse = await _client.GetAsync($"/api/customers/{customerId}");
         var result = await getResponse.Content.ReadFromJsonAsync<ApiResponse>();
+        result.Should().NotBeNull();
         
         var customer = System.Text.Json.JsonSerializer.Deserialize<CustomerDto>(
-            result!.Data.ToString()!,
+            System.Text.Json.JsonSerializer.Serialize(result!.Data),
             new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         customer!.Status.Should().Be("Blocked");
@@ -296,7 +297,7 @@ public class CustomerServiceTests : IClassFixture<IntegrationTestFactory<Custome
 
         var result = await response.Content.ReadFromJsonAsync<ApiResponse>();
         var customer = System.Text.Json.JsonSerializer.Deserialize<CustomerDto>(
-            result!.Data.ToString()!,
+            System.Text.Json.JsonSerializer.Serialize(result!.Data),
             new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         return customer!.Id;

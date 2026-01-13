@@ -114,10 +114,10 @@ public class ApiKeyHelperTests
     [Theory]
     [InlineData("")]
     [InlineData(null)]
-    public void MaskApiKey_WithEmptyKey_ShouldReturnAsterisks(string emptyKey)
+    public void MaskApiKey_WithEmptyKey_ShouldReturnAsterisks(string? emptyKey)
     {
         // Act
-        var maskedKey = ApiKeyHelper.MaskApiKey(emptyKey);
+        var maskedKey = ApiKeyHelper.MaskApiKey(emptyKey!);
 
         // Assert
         maskedKey.Should().Be("****");
@@ -142,10 +142,10 @@ public class ApiKeyHelperTests
     [InlineData("invalid")]
     [InlineData("mb_short")]
     [InlineData("wrong_prefix_but_long_enough_string")]
-    public void IsValidApiKeyFormat_WithInvalidKey_ShouldReturnFalse(string invalidKey)
+    public void IsValidApiKeyFormat_WithInvalidKey_ShouldReturnFalse(string? invalidKey)
     {
         // Act
-        var isValid = ApiKeyHelper.IsValidApiKeyFormat(invalidKey);
+        var isValid = ApiKeyHelper.IsValidApiKeyFormat(invalidKey!);
 
         // Assert
         isValid.Should().BeFalse();

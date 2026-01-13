@@ -50,10 +50,10 @@ public class NationalIdValidatorTests
     [InlineData("1234567890a")] // Contains letter
     [InlineData("")] // Empty
     [InlineData(null)] // Null
-    public void IsValid_WithInvalidNationalId_ShouldReturnFalse(string nationalId)
+    public void IsValid_WithInvalidNationalId_ShouldReturnFalse(string? nationalId)
     {
         // Act
-        var isValid = NationalIdValidator.IsValid(nationalId);
+        var isValid = NationalIdValidator.IsValid(nationalId!);
 
         // Assert
         isValid.Should().BeFalse();
@@ -76,10 +76,10 @@ public class NationalIdValidatorTests
     [InlineData("")]
     [InlineData(null)]
     [InlineData("   ")]
-    public void Normalize_WithEmptyOrWhitespace_ShouldReturnEmpty(string input)
+    public void Normalize_WithEmptyOrWhitespace_ShouldReturnEmpty(string? input)
     {
         // Act
-        var normalized = NationalIdValidator.Normalize(input);
+        var normalized = NationalIdValidator.Normalize(input!);
 
         // Assert
         normalized.Should().BeEmpty();
