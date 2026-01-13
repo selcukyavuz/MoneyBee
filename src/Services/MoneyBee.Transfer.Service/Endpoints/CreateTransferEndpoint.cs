@@ -25,11 +25,12 @@ public static class CreateTransferEndpoint
     private static async Task<IResult> HandleAsync(
         [FromBody] CreateTransferRequest request,
         ITransferService transferService,
-        ILogger<Program> logger)
+        ILogger<Program> logger,
+        CancellationToken cancellationToken)
     {
         try
         {
-            var result = await transferService.CreateTransferAsync(request);
+            var result = await transferService.CreateTransferAsync(request, cancellationToken);
 
             if (!result.IsSuccess)
                 return Results.BadRequest(ApiResponse<CreateTransferResponse>.ErrorResponse(result.Error!));

@@ -1,10 +1,15 @@
 namespace MoneyBee.Customer.Service.Helpers;
 
+/// <summary>
+/// Helper class for validating and normalizing Turkish National ID (TC Kimlik No)
+/// </summary>
 public static class NationalIdValidator
 {
     /// <summary>
-    /// Turkish National ID (TC Kimlik No) validation algorithm
+    /// Validates Turkish National ID (TC Kimlik No) using the official algorithm
     /// </summary>
+    /// <param name="nationalId">The 11-digit national ID to validate</param>
+    /// <returns>True if valid according to Turkish ID algorithm, false otherwise</returns>
     public static bool IsValid(string nationalId)
     {
         if (string.IsNullOrWhiteSpace(nationalId))

@@ -17,8 +17,11 @@ public class TransferValidatorTests
     [InlineData(10000, true)]
     public void RequiresApprovalWait_WithVariousAmounts_ShouldReturnCorrectResult(decimal amount, bool expected)
     {
+        // Arrange
+        const decimal highAmountThreshold = 1000m;
+
         // Act
-        var requiresApproval = TransferValidator.RequiresApprovalWait(amount);
+        var requiresApproval = TransferValidator.RequiresApprovalWait(amount, highAmountThreshold);
 
         // Assert
         requiresApproval.Should().Be(expected);
@@ -29,10 +32,12 @@ public class TransferValidatorTests
     {
         // Arrange
         var highAmount = 1500m;
+        const decimal highAmountThreshold = 1000m;
+        const int approvalWaitMinutes = 5;
         var beforeCalculation = DateTime.UtcNow;
 
         // Act
-        var approvalTime = TransferValidator.CalculateApprovalWaitTime(highAmount);
+        var approvalTime = TransferValidator.CalculateApprovalWaitTime(highAmount, highAmountThreshold, approvalWaitMinutes);
 
         // Assert
         approvalTime.Should().NotBeNull();
@@ -44,9 +49,11 @@ public class TransferValidatorTests
     {
         // Arrange
         var lowAmount = 500m;
+        const decimal highAmountThreshold = 1000m;
+        const int approvalWaitMinutes = 5;
 
         // Act
-        var approvalTime = TransferValidator.CalculateApprovalWaitTime(lowAmount);
+        var approvalTime = TransferValidator.CalculateApprovalWaitTime(lowAmount, highAmountThreshold, approvalWaitMinutes);
 
         // Assert
         approvalTime.Should().BeNull();

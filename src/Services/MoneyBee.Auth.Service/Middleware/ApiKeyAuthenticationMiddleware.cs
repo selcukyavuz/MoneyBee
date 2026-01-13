@@ -30,7 +30,7 @@ public class ApiKeyAuthenticationMiddleware
         }
 
         // Extract API Key from header
-        if (!context.Request.Headers.TryGetValue("X-API-Key", out var extractedApiKey))
+        if (!context.Request.Headers.TryGetValue(MoneyBee.Common.Constants.HttpHeaders.ApiKey, out var extractedApiKey))
         {
             context.Response.StatusCode = 401;
             await context.Response.WriteAsJsonAsync(new { error = "API Key is missing" });

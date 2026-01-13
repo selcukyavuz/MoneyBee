@@ -3,40 +3,79 @@ using MoneyBee.Common.Enums;
 
 namespace MoneyBee.Transfer.Service.Domain.Entities;
 
+/// <summary>
+/// Represents a money transfer transaction with fraud detection and business rules
+/// </summary>
 public class Transfer
 {
+    /// <summary>
+    /// Gets the unique identifier of the transfer
+    /// </summary>
     [Key]
     public Guid Id { get; private set; }
 
+    /// <summary>
+    /// Gets the sender customer's unique identifier
+    /// </summary>
     [Required]
     public Guid SenderId { get; private set; }
 
+    /// <summary>
+    /// Gets the receiver customer's unique identifier
+    /// </summary>
     [Required]
     public Guid ReceiverId { get; private set; }
 
+    /// <summary>
+    /// Gets the transfer amount in original currency
+    /// </summary>
     [Required]
     public decimal Amount { get; private set; }
 
+    /// <summary>
+    /// Gets the currency of the transfer
+    /// </summary>
     [Required]
     public Currency Currency { get; private set; }
 
+    /// <summary>
+    /// Gets the transfer amount converted to TRY for limit checks
+    /// </summary>
     [Required]
     public decimal AmountInTRY { get; private set; }
 
+    /// <summary>
+    /// Gets the exchange rate used for currency conversion
+    /// </summary>
     public decimal? ExchangeRate { get; private set; }
 
+    /// <summary>
+    /// Gets the transaction fee charged
+    /// </summary>
     [Required]
     public decimal TransactionFee { get; private set; }
 
+    /// <summary>
+    /// Gets the 8-digit transaction code for completing the transfer
+    /// </summary>
     [Required]
     [MaxLength(10)]
     public string TransactionCode { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// Gets the current status of the transfer
+    /// </summary>
     [Required]
     public TransferStatus Status { get; private set; }
 
+    /// <summary>
+    /// Gets the fraud risk level assessed by fraud detection service
+    /// </summary>
     public RiskLevel? RiskLevel { get; private set; }
 
+    /// <summary>
+    /// Gets the idempotency key for preventing duplicate transfers
+    /// </summary>
     [MaxLength(100)]
     public string? IdempotencyKey { get; private set; }
 

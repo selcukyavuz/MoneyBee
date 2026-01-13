@@ -2,12 +2,31 @@ using StackExchange.Redis;
 
 namespace MoneyBee.Auth.Service.Services;
 
+/// <summary>
+/// Service interface for rate limiting functionality using Redis sliding window algorithm
+/// </summary>
 public interface IRateLimitService
 {
+    /// <summary>
+    /// Checks if a request is allowed based on rate limit
+    /// </summary>
+    /// <param name="identifier">The unique identifier (e.g., API key)</param>
+    /// <param name="maxRequests">Maximum number of requests allowed (default: 100)</param>
+    /// <param name="window">Time window for rate limiting (default: 1 minute)</param>
+    /// <returns>True if request is allowed, false if rate limit exceeded</returns>
     Task<bool> IsRequestAllowedAsync(string identifier, int maxRequests = 100, TimeSpan? window = null);
+    
+    /// <summary>
+    /// Gets the current rate limit information for an identifier
+    /// </summary>
+    /// <param name="identifier">The unique identifier</param>
+    /// <returns>Rate limit information including count, limit, and reset time</returns>
     Task<RateLimitInfo> GetRateLimitInfoAsync(string identifier);
 }
 
+/// <summary>
+/// Contains rate limit information for an identifier
+/// </summary>
 public class RateLimitInfo
 {
     public int RequestCount { get; set; }
@@ -16,23 +35,17 @@ public class RateLimitInfo
     public int Remaining => Math.Max(0, Limit - RequestCount);
 }
 
-public class RateLimitService : IRateLimitService
+public class RateLimitService(
+    IConnectionMultiplexer redis,
+    ILogger<RateLimitService> logger) : IRateLimitService
 {
-    private readonly IConnectionMultiplexer _redis;
-    private readonly ILogger<RateLimitService> _logger;
-
-    public RateLimitService(
-        IConnectionMultiplexer redis,
-        ILogger<RateLimitService> logger)
-    {
-        _redis = redis;
-        _logger = logger;
-    }
+    
+    
 
     public async Task<bool> IsRequestAllowedAsync(string identifier, int maxRequests = 100, TimeSpan? window = null)
     {
         var windowSpan = window ?? TimeSpan.FromMinutes(1);
-        var db = _redis.GetDatabase();
+        var db = redis.GetDatabase();
         
         var key = $"ratelimit:{identifier}";
         var now = DateTime.UtcNow;
@@ -51,7 +64,7 @@ public class RateLimitService : IRateLimitService
 
             if (currentCount >= maxRequests)
             {
-                _logger.LogWarning("Rate limit exceeded for {Identifier}", identifier);
+                logger.LogWarning("Rate limit exceeded for {Identifier}", identifier);
                 return false;
             }
 
@@ -65,7 +78,7 @@ public class RateLimitService : IRateLimitService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error checking rate limit for {Identifier}", identifier);
+            logger.LogError(ex, "Error checking rate limit for {Identifier}", identifier);
             // Fail open - allow request if Redis is down
             return true;
         }
@@ -74,7 +87,7 @@ public class RateLimitService : IRateLimitService
     public async Task<RateLimitInfo> GetRateLimitInfoAsync(string identifier)
     {
         var windowSpan = TimeSpan.FromMinutes(1);
-        var db = _redis.GetDatabase();
+        var db = redis.GetDatabase();
         var key = $"ratelimit:{identifier}";
         var now = DateTime.UtcNow;
         var windowStart = now.Add(-windowSpan);
@@ -93,7 +106,7 @@ public class RateLimitService : IRateLimitService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting rate limit info for {Identifier}", identifier);
+            logger.LogError(ex, "Error getting rate limit info for {Identifier}", identifier);
             return new RateLimitInfo
             {
                 RequestCount = 0,

@@ -1,9 +1,9 @@
-using System.Diagnostics;
 using MoneyBee.Common.Enums;
 using MoneyBee.Common.Events;
 using MoneyBee.Common.Results;
 using MoneyBee.Customer.Service.Application.DTOs;
 using MoneyBee.Customer.Service.Application.Interfaces;
+using MoneyBee.Customer.Service.Constants;
 using MoneyBee.Customer.Service.Domain.Interfaces;
 using MoneyBee.Customer.Service.Domain.Validators;
 using MoneyBee.Customer.Service.Infrastructure.ExternalServices;
@@ -12,33 +12,20 @@ using CustomerEntity = MoneyBee.Customer.Service.Domain.Entities.Customer;
 
 namespace MoneyBee.Customer.Service.Application.Services;
 
-public class CustomerService : ICustomerService
+public class CustomerService(
+    ICustomerRepository repository,
+    IKycService kycService,
+    IEventPublisher eventPublisher,
+    ILogger<CustomerService> logger) : ICustomerService
 {
-    private readonly ICustomerRepository _repository;
-    private readonly IKycService _kycService;
-    private readonly IEventPublisher _eventPublisher;
-    private readonly ILogger<CustomerService> _logger;
-
-    public CustomerService(
-        ICustomerRepository repository,
-        IKycService kycService,
-        IEventPublisher eventPublisher,
-        ILogger<CustomerService> logger)
-    {
-        _repository = repository;
-        _kycService = kycService;
-        _eventPublisher = eventPublisher;
-        _logger = logger;
-    }
-
     public async Task<Result<CustomerDto>> CreateCustomerAsync(CreateCustomerRequest request)
     {
-        var stopwatch = Stopwatch.StartNew();
-        
         // Check if customer already exists
-        var existingCustomer = await _repository.GetByNationalIdAsync(request.NationalId);
-        if (existingCustomer != null)
-            return Result<CustomerDto>.Failure("Customer with this National ID already exists");
+        var existingCustomer = await repository.GetByNationalIdAsync(request.NationalId);
+        if (existingCustomer is not null)
+        {
+            return Result<CustomerDto>.Failure(ErrorMessages.Customer.AlreadyExists);
+        }
 
         // Create customer aggregate using factory method
         var customer = CustomerEntity.Create(
@@ -55,16 +42,16 @@ public class CustomerService : ICustomerService
         // Use domain service for validation
         var validationResult = CustomerValidator.ValidateCustomerForCreation(customer);
         if (!validationResult.IsSuccess)
+        {
             return Result<CustomerDto>.Failure(validationResult.Error!);
+        }
 
         // Perform KYC verification (non-blocking)
-        var kycStopwatch = Stopwatch.StartNew();
-        var kycResult = await _kycService.VerifyCustomerAsync(
+        var kycResult = await kycService.VerifyCustomerAsync(
             request.NationalId,
             request.FirstName,
             request.LastName,
             request.DateOfBirth);
-        kycStopwatch.Stop();
 
         if (kycResult.IsVerified)
         {
@@ -72,14 +59,14 @@ public class CustomerService : ICustomerService
         }
         else
         {
-            _logger.LogWarning("KYC verification failed for {NationalId}: {Message}. Customer will be created with unverified status.",
+            logger.LogWarning("KYC verification failed for {NationalId}: {Message}. Customer will be created with unverified status.",
                 customer.NationalId, kycResult.Message);
         }
 
-        await _repository.CreateAsync(customer);
+        await repository.CreateAsync(customer);
 
         // Publish integration event directly to RabbitMQ
-        await _eventPublisher.PublishAsync(new CustomerCreatedEvent
+        await eventPublisher.PublishAsync(new CustomerCreatedEvent
         {
             CustomerId = customer.Id,
             NationalId = customer.NationalId,
@@ -90,56 +77,54 @@ public class CustomerService : ICustomerService
         });
 
         var dto = MapToDto(customer);
-
-        stopwatch.Stop();
         
         var logMessage = kycResult.IsVerified 
             ? "Customer created with verified KYC" 
             : "Customer created with unverified KYC - verification will be retried";
         
-        _logger.LogInformation("{LogMessage}: {CustomerId} - {NationalId}", logMessage, customer.Id, customer.NationalId);
+        logger.LogInformation("{LogMessage}: {CustomerId} - {NationalId}", logMessage, customer.Id, customer.NationalId);
 
         return Result<CustomerDto>.Success(dto);
     }
 
     public async Task<IEnumerable<CustomerDto>> GetAllCustomersAsync(int pageNumber = 1, int pageSize = 50)
     {
-        var stopwatch = Stopwatch.StartNew();
-        var customers = await _repository.GetAllAsync(pageNumber, pageSize);
-        stopwatch.Stop();
+        var customers = await repository.GetAllAsync(pageNumber, pageSize);
         return customers.Select(MapToDto);
     }
 
     public async Task<Result<CustomerDto>> GetCustomerByIdAsync(Guid id)
     {
-        var stopwatch = Stopwatch.StartNew();
-        var customer = await _repository.GetByIdAsync(id);
-        stopwatch.Stop();
+        var customer = await repository.GetByIdAsync(id);
         
-        if (customer == null)
-            return Result<CustomerDto>.Failure("Customer not found");
+        if (customer is null)
+        {
+            return Result<CustomerDto>.Failure(ErrorMessages.Customer.NotFound);
+        }
         
         return Result<CustomerDto>.Success(MapToDto(customer));
     }
 
     public async Task<Result<CustomerDto>> GetCustomerByNationalIdAsync(string nationalId)
     {
-        var stopwatch = Stopwatch.StartNew();
-        var customer = await _repository.GetByNationalIdAsync(nationalId);
-        stopwatch.Stop();
+        var customer = await repository.GetByNationalIdAsync(nationalId);
         
-        if (customer == null)
-            return Result<CustomerDto>.Failure("Customer not found");
+        if (customer is null)
+        {
+            return Result<CustomerDto>.Failure(ErrorMessages.Customer.NotFound);
+        }
         
         return Result<CustomerDto>.Success(MapToDto(customer));
     }
 
     public async Task<Result<CustomerDto>> UpdateCustomerAsync(Guid id, UpdateCustomerRequest request)
     {
-        var stopwatch = Stopwatch.StartNew();
-        var customer = await _repository.GetByIdAsync(id);
-        if (customer == null)
-            return Result<CustomerDto>.Failure("Customer not found");
+        var customer = await repository.GetByIdAsync(id);
+
+        if (customer is null)
+        {
+            return Result<CustomerDto>.Failure(ErrorMessages.Customer.NotFound);
+        }
 
         // Use aggregate method to update information
         customer.UpdateInformation(
@@ -149,26 +134,28 @@ public class CustomerService : ICustomerService
             request.Address ?? customer.Address,
             request.Email ?? customer.Email);
 
-        await _repository.UpdateAsync(customer);
+        await repository.UpdateAsync(customer);
 
-        stopwatch.Stop();
-
-        _logger.LogInformation("Customer updated: {CustomerId}", id);
+        logger.LogInformation("Customer updated: {CustomerId}", id);
 
         return Result<CustomerDto>.Success(MapToDto(customer));
     }
 
     public async Task<Result> UpdateCustomerStatusAsync(Guid id, UpdateCustomerStatusRequest request)
     {
-        var stopwatch = Stopwatch.StartNew();
-        var customer = await _repository.GetByIdAsync(id);
-        if (customer == null)
-            return Result.Failure("Customer not found");
+        var customer = await repository.GetByIdAsync(id);
 
-        // Use domain service for validation
+        if (customer is null)
+        {
+            return Result.Failure(ErrorMessages.Customer.NotFound);
+        }
+
         var validationResult = CustomerValidator.ValidateCustomerUpdate(customer, request.Status);
+        
         if (!validationResult.IsSuccess)
+        {
             return Result.Failure(validationResult.Error!);
+        }
 
         // Capture old status before update for event
         var oldStatus = customer.Status;
@@ -176,14 +163,13 @@ public class CustomerService : ICustomerService
         // Use aggregate method to update status
         customer.UpdateStatus(request.Status);
 
-        await _repository.UpdateAsync(customer);
+        await repository.UpdateAsync(customer);
 
-        stopwatch.Stop();
-        _logger.LogInformation("Customer status updated: {CustomerId} -> {NewStatus}. Reason: {Reason}", 
+        logger.LogInformation("Customer status updated: {CustomerId} -> {NewStatus}. Reason: {Reason}", 
             id, request.Status, request.Reason);
 
         // Publish integration event directly to RabbitMQ
-        await _eventPublisher.PublishAsync(new CustomerStatusChangedEvent
+        await eventPublisher.PublishAsync(new CustomerStatusChangedEvent
         {
             CustomerId = customer.Id,
             PreviousStatus = oldStatus.ToString(),
@@ -196,23 +182,23 @@ public class CustomerService : ICustomerService
 
     public async Task<bool> DeleteCustomerAsync(Guid id)
     {
-        var stopwatch = Stopwatch.StartNew();
-        var customer = await _repository.GetByIdAsync(id);
-        if (customer == null)
+        var customer = await repository.GetByIdAsync(id);
+        if (customer is null)
+        {
             return false;
+        }
 
         // Mark for deletion and raise domain event
         customer.MarkForDeletion();
 
-        var deleted = await _repository.DeleteAsync(id);
+        var deleted = await repository.DeleteAsync(id);
 
         if (deleted)
         {
-            stopwatch.Stop();
-            _logger.LogWarning("Customer deleted: {CustomerId}", id);
+            logger.LogWarning("Customer deleted: {CustomerId}", id);
 
             // Publish integration event directly to RabbitMQ
-            await _eventPublisher.PublishAsync(new CustomerDeletedEvent
+            await eventPublisher.PublishAsync(new CustomerDeletedEvent
             {
                 CustomerId = customer.Id,
                 NationalId = customer.NationalId,
@@ -227,9 +213,9 @@ public class CustomerService : ICustomerService
     {
         try
         {
-            var customer = await _repository.GetByNationalIdAsync(nationalId);
+            var customer = await repository.GetByNationalIdAsync(nationalId);
 
-            if (customer == null)
+            if (customer is null)
             {
                 return new CustomerVerificationResponse
                 {
@@ -247,6 +233,8 @@ public class CustomerService : ICustomerService
                 {
                     Exists = true,
                     CustomerId = customer.Id,
+                    Status = customer.Status,
+                    KycVerified = customer.KycVerified,
                     IsActive = false,
                     Message = $"Customer exists but status is {customer.Status}"
                 };
@@ -256,6 +244,8 @@ public class CustomerService : ICustomerService
             {
                 Exists = true,
                 CustomerId = customer.Id,
+                Status = customer.Status,
+                KycVerified = customer.KycVerified,
                 IsActive = true,
                 Message = "Customer found and active"
             };

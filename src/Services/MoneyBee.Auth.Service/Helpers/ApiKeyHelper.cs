@@ -3,11 +3,18 @@ using System.Text;
 
 namespace MoneyBee.Auth.Service.Helpers;
 
+/// <summary>
+/// Helper class for API Key generation, hashing, and validation
+/// </summary>
 public static class ApiKeyHelper
 {
     private const string Prefix = "mb_";
     private const int KeyLength = 32;
 
+    /// <summary>
+    /// Generates a new random API key with "mb_" prefix
+    /// </summary>
+    /// <returns>A base64-encoded API key with prefix (35 characters total)</returns>
     public static string GenerateApiKey()
     {
         var randomBytes = new byte[KeyLength];
@@ -20,16 +27,20 @@ public static class ApiKeyHelper
             .Replace("+", "")
             .Replace("/", "")
             .Replace("=", "")
-            .Substring(0, KeyLength);
+            [..KeyLength];
 
         return $"{Prefix}{key}";
     }
 
+    /// <summary>
+    /// Hashes an API key using SHA256 algorithm
+    /// </summary>
+    /// <param name="apiKey">The API key to hash</param>
+    /// <returns>SHA256 hash of the API key as hexadecimal string</returns>
     public static string HashApiKey(string apiKey)
     {
-        using var sha256 = SHA256.Create();
         var bytes = Encoding.UTF8.GetBytes(apiKey);
-        var hash = sha256.ComputeHash(bytes);
+        var hash = SHA256.HashData(bytes);
         return Convert.ToBase64String(hash);
     }
 
@@ -38,8 +49,8 @@ public static class ApiKeyHelper
         if (string.IsNullOrEmpty(apiKey) || apiKey.Length < 12)
             return "****";
 
-        var prefix = apiKey.Substring(0, 3); // "mb_"
-        var suffix = apiKey.Substring(apiKey.Length - 4); // last 4 chars
+        var prefix = apiKey[..3]; // "mb_"
+        var suffix = apiKey[^4..]; // last 4 chars
         return $"{prefix}****...****{suffix}";
     }
 

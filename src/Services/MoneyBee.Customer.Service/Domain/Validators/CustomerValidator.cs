@@ -1,5 +1,6 @@
 using MoneyBee.Common.Enums;
 using MoneyBee.Common.Results;
+using MoneyBee.Customer.Service.Constants;
 using CustomerEntity = MoneyBee.Customer.Service.Domain.Entities.Customer;
 
 namespace MoneyBee.Customer.Service.Domain.Validators;
@@ -12,10 +13,10 @@ public static class CustomerValidator
     public static Result ValidateCustomerForCreation(CustomerEntity customer)
     {
         if (!customer.IsAdult())
-            return Result.Failure("Customer must be at least 18 years old");
+            return Result.Failure(ErrorMessages.Customer.MustBeAdult);
 
         if (customer.CustomerType == CustomerType.Corporate && string.IsNullOrWhiteSpace(customer.TaxNumber))
-            return Result.Failure("Corporate customers must have a tax number");
+            return Result.Failure(ErrorMessages.Customer.CorporateMustHaveTaxNumber);
 
         return Result.Success();
     }
@@ -35,7 +36,7 @@ public static class CustomerValidator
         if (customer.Status == CustomerStatus.Blocked && newStatus == CustomerStatus.Active)
         {
             if (!customer.KycVerified)
-                return Result.Failure("Cannot activate blocked customer without KYC verification");
+                return Result.Failure(ErrorMessages.Customer.CannotActivateBlockedWithoutKyc);
         }
 
         return Result.Success();

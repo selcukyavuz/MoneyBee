@@ -1,9 +1,17 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using MoneyBee.Common.Constants;
 using MoneyBee.Common.Services;
+using MoneyBee.Transfer.Service.Application.Options;
+using MoneyBee.Transfer.Service.Application.Services;
 using MoneyBee.Transfer.Service.Endpoints;
 using MoneyBee.Transfer.Service.Infrastructure.Data;
-using MoneyBee.Transfer.Service.Infrastructure.ExternalServices;
+using MoneyBee.Transfer.Service.Infrastructure.ExternalServices.CustomerService;
+using MoneyBee.Transfer.Service.Infrastructure.ExternalServices.ExchangeRateService;
+using MoneyBee.Transfer.Service.Infrastructure.ExternalServices.FraudDetectionService;
 using MoneyBee.Transfer.Service.Infrastructure.Messaging;
+using Polly;
+using Polly.Extensions.Http;
 using RabbitMQ.Client;
 using Serilog;
 using StackExchange.Redis;
@@ -19,6 +27,14 @@ Log.Logger = new LoggerConfiguration()
     .CreateLogger();
 
 builder.Host.UseSerilog();
+
+// Configure Options
+builder.Services.Configure<TransferSettings>(builder.Configuration.GetSection("TransferSettings"));
+builder.Services.Configure<FeeSettings>(builder.Configuration.GetSection("FeeSettings"));
+builder.Services.Configure<DistributedLockSettings>(builder.Configuration.GetSection("DistributedLockSettings"));
+builder.Services.Configure<CustomerServiceOptions>(builder.Configuration.GetSection(ConfigurationKeys.ExternalServices.CustomerService));
+builder.Services.Configure<FraudDetectionServiceOptions>(builder.Configuration.GetSection(ConfigurationKeys.ExternalServices.FraudService));
+builder.Services.Configure<ExchangeRateServiceOptions>(builder.Configuration.GetSection(ConfigurationKeys.ExternalServices.ExchangeRateService));
 
 // Add services to the container
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -37,7 +53,7 @@ builder.Services.AddSwaggerGen(c =>
     {
         Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
         In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Name = "X-API-Key",
+        Name = HttpHeaders.ApiKey,
         Description = "API Key for authentication"
     });
 });
@@ -46,17 +62,56 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddDbContext<TransferDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// HTTP Clients
-builder.Services.AddHttpClient("FraudService");
-builder.Services.AddHttpClient("ExchangeRateService");
-builder.Services.AddHttpClient("CustomerService");
+// HTTP Clients with Typed Client Pattern
+builder.Services.AddHttpClient<ICustomerService, CustomerService>((sp, client) =>
+{
+    var options = sp.GetRequiredService<IOptions<CustomerServiceOptions>>().Value;
+    client.BaseAddress = new Uri(options.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+})
+.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+{
+    PooledConnectionLifetime = TimeSpan.FromMinutes(2)
+})
+.AddPolicyHandler(HttpPolicyExtensions
+    .HandleTransientHttpError()
+    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))));
+
+builder.Services.AddHttpClient<IFraudDetectionService, FraudDetectionService>((sp, client) =>
+{
+    var options = sp.GetRequiredService<IOptions<FraudDetectionServiceOptions>>().Value;
+    client.BaseAddress = new Uri(options.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+})
+.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+{
+    PooledConnectionLifetime = TimeSpan.FromMinutes(2)
+})
+.AddPolicyHandler(HttpPolicyExtensions
+    .HandleTransientHttpError()
+    .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30)));
+
+builder.Services.AddHttpClient<IExchangeRateService, ExchangeRateService>((sp, client) =>
+{
+    var options = sp.GetRequiredService<IOptions<ExchangeRateServiceOptions>>().Value;
+    client.BaseAddress = new Uri(options.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+})
+.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+{
+    PooledConnectionLifetime = TimeSpan.FromMinutes(2)
+})
+.AddPolicyHandler(HttpPolicyExtensions
+    .HandleTransientHttpError()
+    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))));
 
 // Services
-builder.Services.AddScoped<IFraudDetectionService, FraudDetectionService>();
-builder.Services.AddScoped<IExchangeRateService, ExchangeRateService>();
-builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<MoneyBee.Transfer.Service.Domain.Interfaces.ITransferRepository, MoneyBee.Transfer.Service.Infrastructure.Repositories.TransferRepository>();
 builder.Services.AddScoped<MoneyBee.Transfer.Service.Application.Interfaces.ITransferService, MoneyBee.Transfer.Service.Application.Services.TransferService>();
+
+// Transfer Service Dependencies
+builder.Services.AddScoped<TransferValidationService>();
+builder.Services.AddScoped<TransferCodeGenerator>();
 
 // Redis
 var redisConfig = ConfigurationOptions.Parse(builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379");

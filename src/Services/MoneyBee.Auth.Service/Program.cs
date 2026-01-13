@@ -42,7 +42,7 @@ builder.Services.AddSwaggerGen(c =>
     {
         Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
         In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Name = "X-API-Key",
+        Name = MoneyBee.Common.Constants.HttpHeaders.ApiKey,
         Description = "API Key for authentication"
     });
     c.AddSecurityRequirement(new()

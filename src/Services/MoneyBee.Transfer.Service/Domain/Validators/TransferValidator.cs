@@ -1,5 +1,6 @@
 using MoneyBee.Common.Enums;
 using MoneyBee.Common.Results;
+using MoneyBee.Transfer.Service.Constants;
 using TransferEntity = MoneyBee.Transfer.Service.Domain.Entities.Transfer;
 
 namespace MoneyBee.Transfer.Service.Domain.Validators;
@@ -9,28 +10,26 @@ namespace MoneyBee.Transfer.Service.Domain.Validators;
 /// </summary>
 public static class TransferValidator
 {
-    private const decimal HIGH_AMOUNT_THRESHOLD_TRY = 1000m;
-
-    public static bool RequiresApprovalWait(decimal amountInTRY)
+    public static bool RequiresApprovalWait(decimal amountInTRY, decimal highAmountThreshold)
     {
-        return amountInTRY > HIGH_AMOUNT_THRESHOLD_TRY;
+        return amountInTRY > highAmountThreshold;
     }
 
-    public static DateTime? CalculateApprovalWaitTime(decimal amountInTRY)
+    public static DateTime? CalculateApprovalWaitTime(decimal amountInTRY, decimal highAmountThreshold, int approvalWaitMinutes)
     {
-        if (!RequiresApprovalWait(amountInTRY))
+        if (!RequiresApprovalWait(amountInTRY, highAmountThreshold))
             return null;
 
-        return DateTime.UtcNow.AddMinutes(5);
+        return DateTime.UtcNow.AddMinutes(approvalWaitMinutes);
     }
 
     public static Result ValidateTransferForCompletion(TransferEntity transfer, string receiverNationalId)
     {
         if (transfer.Status != TransferStatus.Pending)
-            return Result.Failure($"Transfer cannot be completed. Status: {transfer.Status}");
+            return Result.Failure(string.Format(ErrorMessages.Transfer.CannotBeCompleted, transfer.Status));
 
         if (transfer.ReceiverNationalId != receiverNationalId)
-            return Result.Failure("Receiver identity verification failed");
+            return Result.Failure(ErrorMessages.Transfer.ReceiverVerificationFailed);
 
         if (transfer.RequiresApproval())
         {
@@ -47,7 +46,7 @@ public static class TransferValidator
         var remainingLimit = dailyLimit - currentDailyTotal;
         
         if (remainingLimit < newAmount)
-            return Result.Failure($"Daily transfer limit exceeded. Remaining: {remainingLimit:F2} TRY");
+            return Result.Failure(string.Format(ErrorMessages.Transfer.DailyLimitExceeded, remainingLimit));
 
         return Result.Success();
     }

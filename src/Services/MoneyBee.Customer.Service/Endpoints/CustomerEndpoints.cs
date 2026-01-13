@@ -10,13 +10,14 @@ public static class CustomerEndpoints
     /// </summary>
     public static RouteGroupBuilder MapCustomerEndpoints(this IEndpointRouteBuilder routes)
     {
-        var group = routes.MapGroup("/api/customers")
+        var group = routes.MapGroup(MoneyBee.Customer.Service.Constants.ApiRoutes.BaseRoute)
             .WithTags("Customers")
             .WithOpenApi();
 
         group.MapCreateCustomer();
         group.MapGetCustomer();
         group.MapGetCustomers();
+        group.MapGetCustomerByNationalId();
         group.MapUpdateCustomer();
         group.MapUpdateCustomerStatus();
         group.MapDeleteCustomer();

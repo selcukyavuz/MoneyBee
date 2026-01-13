@@ -49,8 +49,10 @@ public class ApiKeyRepository : IApiKeyRepository
     public async Task<bool> DeleteAsync(Guid id)
     {
         var apiKey = await GetByIdAsync(id);
-        if (apiKey == null)
+        if (apiKey is null)
+        {
             return false;
+        }
 
         _context.ApiKeys.Remove(apiKey);
         await _context.SaveChangesAsync();

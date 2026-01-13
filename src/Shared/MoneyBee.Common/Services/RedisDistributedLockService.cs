@@ -7,25 +7,17 @@ namespace MoneyBee.Common.Services;
 /// Redis-based distributed lock implementation for preventing race conditions.
 /// Uses Redis SET NX EX for atomic lock acquisition with automatic expiration.
 /// </summary>
-public class RedisDistributedLockService : IDistributedLockService
+public class RedisDistributedLockService(
+    IConnectionMultiplexer redis,
+    ILogger<RedisDistributedLockService> logger) : IDistributedLockService
 {
-    private readonly IConnectionMultiplexer _redis;
-    private readonly ILogger<RedisDistributedLockService> _logger;
-
-    public RedisDistributedLockService(
-        IConnectionMultiplexer redis,
-        ILogger<RedisDistributedLockService> logger)
-    {
-        _redis = redis;
-        _logger = logger;
-    }
 
     public async Task<T> ExecuteWithLockAsync<T>(
         string lockKey,
         TimeSpan expiry,
         Func<Task<T>> action)
     {
-        var db = _redis.GetDatabase();
+        var db = redis.GetDatabase();
         var lockValue = Guid.NewGuid().ToString(); // Unique lock value to prevent accidental unlock
         var lockAcquired = false;
 
@@ -41,13 +33,13 @@ public class RedisDistributedLockService : IDistributedLockService
 
             if (!lockAcquired)
             {
-                _logger.LogWarning(
+                logger.LogWarning(
                     "Failed to acquire distributed lock: {LockKey}. Another process holds the lock.",
                     lockKey);
                 throw new TimeoutException($"Could not acquire lock: {lockKey}");
             }
 
-            _logger.LogDebug("Acquired distributed lock: {LockKey}", lockKey);
+            logger.LogDebug("Acquired distributed lock: {LockKey}", lockKey);
 
             // Execute the action while holding the lock
             return await action();
@@ -70,7 +62,7 @@ public class RedisDistributedLockService : IDistributedLockService
                     new RedisKey[] { lockKey },
                     new RedisValue[] { lockValue });
 
-                _logger.LogDebug("Released distributed lock: {LockKey}", lockKey);
+                logger.LogDebug("Released distributed lock: {LockKey}", lockKey);
             }
         }
     }
