@@ -6,6 +6,7 @@ using MoneyBee.Auth.Service.Infrastructure.Data;
 using MoneyBee.Auth.Service.Infrastructure.ApiKeys;
 using MoneyBee.Auth.Service.Infrastructure;
 using MoneyBee.Common.Abstractions;
+using MoneyBee.Web.Common.Extensions;
 using Serilog;
 using StackExchange.Redis;
 
@@ -27,35 +28,9 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
 });
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new() { 
-        Title = "MoneyBee Auth Service API", 
-        Version = "v1",
-        Description = "Authentication and Rate Limiting Service for MoneyBee Money Transfer System"
-    });
-    c.AddSecurityDefinition("ApiKey", new()
-    {
-        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
-        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Name = MoneyBee.Common.Constants.HttpHeaders.ApiKey,
-        Description = "API Key for authentication"
-    });
-    c.AddSecurityRequirement(new()
-    {
-        {
-            new()
-            {
-                Reference = new()
-                {
-                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
-                    Id = "ApiKey"
-                }
-            },
-            Array.Empty<string>()
-        }
-    });
-});
+builder.Services.AddSwaggerWithApiKey(
+    "MoneyBee Auth Service API",
+    "Authentication and Rate Limiting Service for MoneyBee Money Transfer System");
 
 // Database
 builder.Services.AddDbContext<AuthDbContext>(options =>
@@ -64,28 +39,19 @@ builder.Services.AddDbContext<AuthDbContext>(options =>
         b => b.MigrationsAssembly("MoneyBee.Auth.Service")));
 
 // Redis
-var redisConnectionString = builder.Configuration.GetValue<string>("Redis:ConnectionString") ?? "localhost:6379";
-var redisConfig = ConfigurationOptions.Parse(redisConnectionString);
-redisConfig.AbortOnConnectFail = false; // Allow app to start without Redis
-builder.Services.AddSingleton<IConnectionMultiplexer>(sp => 
-    ConnectionMultiplexer.Connect(redisConfig));
+builder.Services.AddRedisConnectionMultiplexer(builder.Configuration);
 
 // Options Pattern
 builder.Services.Configure<MoneyBee.Auth.Service.Infrastructure.RateLimitOptions>(
     builder.Configuration.GetSection(MoneyBee.Auth.Service.Infrastructure.RateLimitOptions.SectionName));
 
 // Clean Architecture - Dependency Injection
-builder.Services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
+var authAssembly = typeof(Program).Assembly;
 
-// Command Handlers
-builder.Services.AddScoped<MoneyBee.Auth.Service.Application.ApiKeys.Commands.CreateApiKey.CreateApiKeyHandler>();
-builder.Services.AddScoped<MoneyBee.Auth.Service.Application.ApiKeys.Commands.UpdateApiKey.UpdateApiKeyLastUsedHandler>();
-
-// Query Handlers
-builder.Services.AddScoped<MoneyBee.Auth.Service.Application.ApiKeys.Queries.ValidateApiKey.ValidateApiKeyHandler>();
-
-// Infrastructure Services
-builder.Services.AddScoped<IRateLimitService, RateLimitService>();
+// Automatic registration using Scrutor
+builder.Services.AddApplicationHandlers(authAssembly);
+builder.Services.AddRepositories(authAssembly);
+builder.Services.AddInfrastructureServices(authAssembly);
 
 // API Key Validator (direct DB access for Auth Service)
 builder.Services.AddScoped<IApiKeyValidator, DirectApiKeyValidator>();
@@ -97,19 +63,7 @@ builder.Services.AddHealthChecks()
 var app = builder.Build();
 
 // Run migrations automatically
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
-    try
-    {
-        await db.Database.MigrateAsync();
-        Log.Information("Database migrations applied successfully");
-    }
-    catch (Exception ex)
-    {
-        Log.Error(ex, "Error applying database migrations");
-    }
-}
+await app.ApplyMigrationsAsync<AuthDbContext>();
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
@@ -118,14 +72,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Global exception handling - must be first
-app.UseMiddleware<MoneyBee.Common.Middleware.GlobalExceptionHandlerMiddleware>();
+// Standard middleware pipeline
+app.UseStandardMiddleware();
 
-app.UseSerilogRequestLogging();
-
-
-// Custom Middleware
-app.UseMiddleware<MoneyBee.Common.Middleware.ApiKeyAuthenticationMiddleware>();
+// Rate limiting middleware (specific to Auth Service)
 app.UseMiddleware<RateLimitMiddleware>();
 
 // Map endpoints

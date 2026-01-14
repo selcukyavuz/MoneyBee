@@ -19,6 +19,7 @@ using MoneyBee.Transfer.Service.Infrastructure.Messaging;
 using MoneyBee.Transfer.Service.Infrastructure.ExternalServices.CustomerService;
 using MoneyBee.Transfer.Service.Infrastructure.ExternalServices.ExchangeRateService;
 using MoneyBee.Transfer.Service.Infrastructure.ExternalServices.FraudDetectionService;
+using MoneyBee.Web.Common.Extensions;
 using Polly;
 using Polly.Extensions.Http;
 using RabbitMQ.Client;
@@ -54,130 +55,66 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
 });
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new() { 
-        Title = "MoneyBee Transfer Service API", 
-        Version = "v1",
-        Description = "Money Transfer Management Service for MoneyBee Money Transfer System"
-    });
-    c.AddSecurityDefinition("ApiKey", new()
-    {
-        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
-        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Name = HttpHeaders.ApiKey,
-        Description = "API Key for authentication"
-    });
-});
+builder.Services.AddSwaggerWithApiKey(
+    "MoneyBee Transfer Service API",
+    "Money Transfer Management Service for MoneyBee Money Transfer System");
 
 // Database
 builder.Services.AddDbContext<TransferDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // HTTP Clients with Typed Client Pattern
-builder.Services.AddHttpClient<ICustomerService, CustomerService>((sp, client) =>
-{
-    var options = sp.GetRequiredService<IOptions<CustomerServiceOptions>>().Value;
-    client.BaseAddress = new Uri(options.BaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-})
-.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
-{
-    PooledConnectionLifetime = TimeSpan.FromMinutes(2)
-})
-.AddPolicyHandler(HttpPolicyExtensions
-    .HandleTransientHttpError()
-    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))));
-
-builder.Services.AddHttpClient<IFraudDetectionService, FraudDetectionService>((sp, client) =>
-{
-    var options = sp.GetRequiredService<IOptions<FraudDetectionServiceOptions>>().Value;
-    client.BaseAddress = new Uri(options.BaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-})
-.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
-{
-    PooledConnectionLifetime = TimeSpan.FromMinutes(2)
-})
-.AddPolicyHandler(HttpPolicyExtensions
-    .HandleTransientHttpError()
-    .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30)));
-
-builder.Services.AddHttpClient<IExchangeRateService, ExchangeRateService>((sp, client) =>
-{
-    var options = sp.GetRequiredService<IOptions<ExchangeRateServiceOptions>>().Value;
-    client.BaseAddress = new Uri(options.BaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-})
-.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
-{
-    PooledConnectionLifetime = TimeSpan.FromMinutes(2)
-})
-.AddPolicyHandler(HttpPolicyExtensions
-    .HandleTransientHttpError()
-    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))));
-
-// Auth Service HTTP Client for API key validation
-builder.Services.AddHttpClient<MoneyBee.Common.Abstractions.IApiKeyValidator, MoneyBee.Common.Infrastructure.Caching.CachedApiKeyValidator>(
+builder.Services.AddHttpClientWithRetry<ICustomerService, CustomerService>(
     (sp, client) =>
     {
-        var options = sp.GetRequiredService<IOptions<AuthServiceOptions>>().Value;
-        client.BaseAddress = new Uri(options.Url);
+        var options = sp.GetRequiredService<IOptions<CustomerServiceOptions>>().Value;
+        client.BaseAddress = new Uri(options.BaseUrl);
         client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-    });
+    },
+    retryCount: 3);
 
-// Services
-builder.Services.AddScoped<MoneyBee.Transfer.Service.Domain.Transfers.ITransferRepository, MoneyBee.Transfer.Service.Infrastructure.Transfers.TransferRepository>();
-builder.Services.AddSingleton<MoneyBee.Transfer.Service.Application.Transfers.Services.ITransactionCodeGenerator, MoneyBee.Transfer.Service.Infrastructure.Transfers.Services.TransactionCodeGenerator>();
+builder.Services.AddHttpClientWithCircuitBreaker<IFraudDetectionService, FraudDetectionService>(
+    (sp, client) =>
+    {
+        var options = sp.GetRequiredService<IOptions<FraudDetectionServiceOptions>>().Value;
+        client.BaseAddress = new Uri(options.BaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+    },
+    handledEventsAllowedBeforeBreaking: 5,
+    durationOfBreakSeconds: 30);
 
-// Command Handlers
-builder.Services.AddScoped<CreateTransferHandler>();
-builder.Services.AddScoped<CompleteTransferHandler>();
-builder.Services.AddScoped<CancelTransferHandler>();
+builder.Services.AddHttpClientWithRetry<IExchangeRateService, ExchangeRateService>(
+    (sp, client) =>
+    {
+        var options = sp.GetRequiredService<IOptions<ExchangeRateServiceOptions>>().Value;
+        client.BaseAddress = new Uri(options.BaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+    },
+    retryCount: 3);
 
-// Query Handlers  
-builder.Services.AddScoped<GetTransferByCodeHandler>();
-builder.Services.AddScoped<GetCustomerTransfersHandler>();
-builder.Services.AddScoped<CheckDailyLimitHandler>();
+// Auth Service for API key validation
+builder.Services.AddAuthServiceClient(builder.Configuration);
+
+// Clean Architecture - Dependency Injection
+var transferAssembly = typeof(Program).Assembly;
+
+// Automatic registration using Scrutor
+builder.Services.AddApplicationHandlers(transferAssembly);
+builder.Services.AddRepositories(transferAssembly);
+builder.Services.AddInfrastructureServices(transferAssembly);
+
+// Singleton Services
+builder.Services.AddSingleton<MoneyBee.Transfer.Service.Application.Transfers.Services.ITransactionCodeGenerator, 
+    MoneyBee.Transfer.Service.Infrastructure.Transfers.Services.TransactionCodeGenerator>();
 
 // Redis
-var redisConfig = ConfigurationOptions.Parse(builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379");
-redisConfig.AbortOnConnectFail = false;
-builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-    ConnectionMultiplexer.Connect(redisConfig));
+builder.Services.AddRedisConnectionMultiplexer(builder.Configuration);
 
 // Redis Cache for API Key validation
-builder.Services.AddStackExchangeRedisCache(options =>
-{
-    options.Configuration = builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379";
-    options.InstanceName = "TransferService:";
-});
+builder.Services.AddRedisCacheWithInstance(builder.Configuration, "TransferService");
 
 // RabbitMQ
-builder.Services.AddSingleton<IConnection>(sp =>
-{
-    var logger = sp.GetRequiredService<ILogger<Program>>();
-    var options = sp.GetRequiredService<IOptions<MoneyBee.Common.Options.RabbitMqOptions>>().Value;
-    try
-    {
-        var factory = new ConnectionFactory()
-        {
-            HostName = options.Host,
-            UserName = options.Username,
-            Password = options.Password,
-            AutomaticRecoveryEnabled = options.AutomaticRecoveryEnabled,
-            NetworkRecoveryInterval = TimeSpan.FromSeconds(options.NetworkRecoveryIntervalSeconds)
-        };
-        var connection = factory.CreateConnection();
-        logger.LogInformation("RabbitMQ connection established");
-        return connection;
-    }
-    catch (Exception ex)
-    {
-        logger.LogWarning(ex, "Failed to connect to RabbitMQ. Service will start without message queue support.");
-        return null!;
-    }
-});
+builder.Services.AddRabbitMq(builder.Configuration);
 
 // Infrastructure Services
 builder.Services.AddSingleton<IDistributedLockService, RedisDistributedLockService>();
@@ -208,19 +145,7 @@ builder.Services.AddHealthChecks()
 var app = builder.Build();
 
 // Run migrations automatically
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<TransferDbContext>();
-    try
-    {
-        await db.Database.MigrateAsync();
-        Log.Information("Database migrations applied successfully");
-    }
-    catch (Exception ex)
-    {
-        Log.Error(ex, "Error applying database migrations");
-    }
-}
+await app.ApplyMigrationsAsync<TransferDbContext>();
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
@@ -229,13 +154,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Global exception handling - must be first
-app.UseMiddleware<MoneyBee.Common.Middleware.GlobalExceptionHandlerMiddleware>();
-
-app.UseSerilogRequestLogging();
-
-// API Key Authentication
-app.UseMiddleware<MoneyBee.Common.Middleware.ApiKeyAuthenticationMiddleware>();
+// Standard middleware pipeline
+app.UseStandardMiddleware();
 
 // Map endpoints
 app.MapTransferEndpoints();
