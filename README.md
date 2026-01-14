@@ -392,12 +392,6 @@ if (!string.IsNullOrWhiteSpace(request.IdempotencyKey))
 }
 ```
 
-### 4. **Unit of Work Pattern**
-Atomic database + event dispatch:
-```csharp
-await _unitOfWork.SaveChangesAsync(); // DB save + event dispatch atomic
-```
-
 ## 🛑 Stopping the System
 
 ```bash
