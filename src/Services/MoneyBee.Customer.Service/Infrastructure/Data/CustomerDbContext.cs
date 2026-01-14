@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using CustomerEntity = MoneyBee.Customer.Service.Domain.Entities.Customer;
 using MoneyBee.Common.Enums;
+using CustomerEntity = MoneyBee.Customer.Service.Domain.Customers.Customer;
 
 namespace MoneyBee.Customer.Service.Infrastructure.Data;
 

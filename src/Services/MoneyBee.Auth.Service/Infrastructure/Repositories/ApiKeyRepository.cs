@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MoneyBee.Auth.Service.Infrastructure.Data;
-using MoneyBee.Auth.Service.Domain.Entities;
-using MoneyBee.Auth.Service.Domain.Interfaces;
+using MoneyBee.Auth.Service.Domain.ApiKeys;
 
 namespace MoneyBee.Auth.Service.Infrastructure.Repositories;
 

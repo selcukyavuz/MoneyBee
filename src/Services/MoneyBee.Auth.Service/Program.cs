@@ -1,16 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using MoneyBee.Auth.Service.Application.Interfaces;
 using MoneyBee.Auth.Service.Application.Services;
-using MoneyBee.Auth.Service.Application.Validators;
-using MoneyBee.Auth.Service.Domain.Interfaces;
-using MoneyBee.Auth.Service.Endpoints;
+using MoneyBee.Auth.Service.Domain.ApiKeys;
+using MoneyBee.Auth.Service.Presentation;
 using MoneyBee.Auth.Service.Infrastructure.Data;
 using MoneyBee.Auth.Service.Infrastructure.Repositories;
 using MoneyBee.Auth.Service.Middleware;
 using MoneyBee.Auth.Service.Services;
 using MoneyBee.Common.Services;
-using FluentValidation;
-using FluentValidation.AspNetCore;
 using Serilog;
 using StackExchange.Redis;
 
@@ -80,10 +77,6 @@ builder.Services.AddScoped<IRateLimitService, RateLimitService>();
 
 // API Key Validator (direct DB access for Auth Service)
 builder.Services.AddScoped<IApiKeyValidator, DirectApiKeyValidator>();
-
-// FluentValidation
-builder.Services.AddFluentValidationAutoValidation();
-builder.Services.AddValidatorsFromAssemblyContaining<CreateApiKeyValidator>();
 
 // Health Checks
 builder.Services.AddHealthChecks()

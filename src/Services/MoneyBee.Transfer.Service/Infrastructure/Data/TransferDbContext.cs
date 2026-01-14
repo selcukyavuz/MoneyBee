@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using MoneyBee.Transfer.Service.Domain.Entities;
+using MoneyBee.Transfer.Service.Domain.Transfers;
 using MoneyBee.Common.Enums;
 
 namespace MoneyBee.Transfer.Service.Infrastructure.Data;
@@ -10,14 +10,14 @@ public class TransferDbContext : DbContext
     {
     }
 
-    public DbSet<Domain.Entities.Transfer> Transfers { get; set; }
+    public DbSet<Domain.Transfers.Transfer> Transfers { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
         // Configure Transfer
-        modelBuilder.Entity<Domain.Entities.Transfer>(entity =>
+        modelBuilder.Entity<Domain.Transfers.Transfer>(entity =>
         {
             entity.ToTable("transfers");
             

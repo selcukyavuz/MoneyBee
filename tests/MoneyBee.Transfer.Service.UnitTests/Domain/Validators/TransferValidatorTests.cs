@@ -1,9 +1,9 @@
 using FluentAssertions;
 using MoneyBee.Common.Enums;
-using MoneyBee.Transfer.Service.Domain.Validators;
-using TransferEntity = MoneyBee.Transfer.Service.Domain.Entities.Transfer;
+using MoneyBee.Transfer.Service.Domain.Transfers;
+using TransferEntity = MoneyBee.Transfer.Service.Domain.Transfers.Transfer;
 
-namespace MoneyBee.Transfer.Service.UnitTests.Domain.Validators;
+namespace MoneyBee.Transfer.Service.UnitTests.Domain.Transfers;
 
 public class TransferValidatorTests
 {

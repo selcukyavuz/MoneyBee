@@ -3,8 +3,8 @@ using Microsoft.Extensions.Options;
 using MoneyBee.Common.Constants;
 using MoneyBee.Common.Services;
 using MoneyBee.Transfer.Service.Application.Options;
-using MoneyBee.Transfer.Service.Application.Services;
-using MoneyBee.Transfer.Service.Endpoints;
+using MoneyBee.Transfer.Service.Application.Transfers;
+using MoneyBee.Transfer.Service.Presentation;
 using MoneyBee.Transfer.Service.Infrastructure.Data;
 using MoneyBee.Transfer.Service.Infrastructure.ExternalServices.CustomerService;
 using MoneyBee.Transfer.Service.Infrastructure.ExternalServices.ExchangeRateService;
@@ -114,8 +114,8 @@ builder.Services.AddHttpClient<MoneyBee.Common.Services.IApiKeyValidator, MoneyB
 });
 
 // Services
-builder.Services.AddScoped<MoneyBee.Transfer.Service.Domain.Interfaces.ITransferRepository, MoneyBee.Transfer.Service.Infrastructure.Repositories.TransferRepository>();
-builder.Services.AddScoped<MoneyBee.Transfer.Service.Application.Interfaces.ITransferService, MoneyBee.Transfer.Service.Application.Services.TransferService>();
+builder.Services.AddScoped<MoneyBee.Transfer.Service.Domain.Transfers.ITransferRepository, MoneyBee.Transfer.Service.Infrastructure.Transfers.TransferRepository>();
+builder.Services.AddScoped<MoneyBee.Transfer.Service.Application.Transfers.ITransferService, MoneyBee.Transfer.Service.Application.Transfers.TransferService>();
 
 // Transfer Service Dependencies
 builder.Services.AddScoped<TransferValidationService>();

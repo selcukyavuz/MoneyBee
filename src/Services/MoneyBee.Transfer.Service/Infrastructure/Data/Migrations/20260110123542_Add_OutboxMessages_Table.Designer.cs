@@ -79,7 +79,7 @@ namespace MoneyBee.Transfer.Service.Infrastructure.Data.Migrations
                     b.ToTable("outbox_messages", (string)null);
                 });
 
-            modelBuilder.Entity("MoneyBee.Transfer.Service.Domain.Entities.Transfer", b =>
+            modelBuilder.Entity("MoneyBee.Transfer.Service.Domain.Transfers.Transfer", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()

@@ -1,8 +1,7 @@
 using MoneyBee.Auth.Service.Application.DTOs;
 using MoneyBee.Auth.Service.Application.Interfaces;
 using MoneyBee.Auth.Service.Constants;
-using MoneyBee.Auth.Service.Domain.Entities;
-using MoneyBee.Auth.Service.Domain.Interfaces;
+using MoneyBee.Auth.Service.Domain.ApiKeys;
 using MoneyBee.Auth.Service.Helpers;
 using MoneyBee.Common.Results;
 
@@ -15,6 +14,25 @@ public class ApiKeyService(
 
     public async Task<Result<CreateApiKeyResponse>> CreateApiKeyAsync(CreateApiKeyRequest request)
     {
+        // Validation
+        if (string.IsNullOrWhiteSpace(request.Name))
+            return Result<CreateApiKeyResponse>.Validation("Name is required");
+
+        if (request.Name.Length > 100)
+            return Result<CreateApiKeyResponse>.Validation("Name cannot exceed 100 characters");
+
+        if (!string.IsNullOrEmpty(request.Description) && request.Description.Length > 500)
+            return Result<CreateApiKeyResponse>.Validation("Description cannot exceed 500 characters");
+
+        if (request.ExpiresInDays.HasValue)
+        {
+            if (request.ExpiresInDays.Value <= 0)
+                return Result<CreateApiKeyResponse>.Validation("ExpiresInDays must be greater than 0");
+
+            if (request.ExpiresInDays.Value > 3650)
+                return Result<CreateApiKeyResponse>.Validation("ExpiresInDays cannot exceed 3650 (10 years)");
+        }
+
         var apiKey = ApiKeyHelper.GenerateApiKey();
         var keyHash = ApiKeyHelper.HashApiKey(apiKey);
 

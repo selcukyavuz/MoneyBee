@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using MoneyBee.Customer.Service.Domain.Interfaces;
+using MoneyBee.Customer.Service.Domain.Customers;
 using MoneyBee.Customer.Service.Infrastructure.ExternalServices;
 
 namespace MoneyBee.Customer.Service.BackgroundServices;

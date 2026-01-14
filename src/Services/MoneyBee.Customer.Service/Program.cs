@@ -1,11 +1,11 @@
 using Microsoft.EntityFrameworkCore;
-using MoneyBee.Customer.Service.Application.Interfaces;
-using MoneyBee.Customer.Service.Domain.Interfaces;
-using MoneyBee.Customer.Service.Endpoints;
+using MoneyBee.Customer.Service.Application.Customers;
+using MoneyBee.Customer.Service.Domain.Customers;
+using MoneyBee.Customer.Service.Presentation;
 using MoneyBee.Customer.Service.Infrastructure.Data;
 using MoneyBee.Customer.Service.Infrastructure.ExternalServices;
 using MoneyBee.Customer.Service.Infrastructure.Messaging;
-using MoneyBee.Customer.Service.Infrastructure.Repositories;
+using MoneyBee.Customer.Service.Infrastructure.Customers;
 using MoneyBee.Customer.Service.BackgroundServices;
 using RabbitMQ.Client;
 using Serilog;
@@ -93,7 +93,7 @@ builder.Services.AddSingleton<IConnection>(sp =>
 
 // Clean Architecture - Dependency Injection
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
-builder.Services.AddScoped<ICustomerService, MoneyBee.Customer.Service.Application.Services.CustomerService>();
+builder.Services.AddScoped<ICustomerService, CustomerService>();
 
 // Infrastructure Services
 builder.Services.AddScoped<IKycService, KycService>();
