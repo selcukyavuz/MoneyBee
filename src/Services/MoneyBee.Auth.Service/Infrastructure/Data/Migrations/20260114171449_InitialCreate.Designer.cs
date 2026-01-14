@@ -9,10 +9,10 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace MoneyBee.Auth.Service.Infrastructure.Migrations
+namespace MoneyBee.Auth.Service.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(AuthDbContext))]
-    [Migration("20260109182522_InitialCreate")]
+    [Migration("20260114171449_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -25,7 +25,7 @@ namespace MoneyBee.Auth.Service.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("MoneyBee.Auth.Service.Entities.ApiKey", b =>
+            modelBuilder.Entity("MoneyBee.Auth.Service.Domain.ApiKeys.ApiKey", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -34,7 +34,7 @@ namespace MoneyBee.Auth.Service.Infrastructure.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
@@ -44,7 +44,7 @@ namespace MoneyBee.Auth.Service.Infrastructure.Migrations
                         .HasColumnName("description");
 
                     b.Property<DateTime?>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("expires_at");
 
                     b.Property<bool>("IsActive")
@@ -60,7 +60,7 @@ namespace MoneyBee.Auth.Service.Infrastructure.Migrations
                         .HasColumnName("key_hash");
 
                     b.Property<DateTime?>("LastUsedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("last_used_at");
 
                     b.Property<string>("Name")
@@ -71,8 +71,12 @@ namespace MoneyBee.Auth.Service.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("IX_api_keys_is_active");
+
                     b.HasIndex("KeyHash")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("IX_api_keys_key_hash");
 
                     b.ToTable("api_keys", (string)null);
                 });

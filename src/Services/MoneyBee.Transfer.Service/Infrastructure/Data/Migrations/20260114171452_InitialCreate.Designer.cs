@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MoneyBee.Transfer.Service.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(TransferDbContext))]
-    [Migration("20260110122529_Add_RowVersion_For_OptimisticConcurrency")]
-    partial class Add_RowVersion_For_OptimisticConcurrency
+    [Migration("20260114171452_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -25,7 +25,7 @@ namespace MoneyBee.Transfer.Service.Infrastructure.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("MoneyBee.Transfer.Service.Domain.Entities.Transfer", b =>
+            modelBuilder.Entity("MoneyBee.Transfer.Service.Domain.Transfers.Transfer", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()

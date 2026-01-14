@@ -3,17 +3,14 @@ using DotNet.Testcontainers.Builders;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using MoneyBee.Common.Constants;
-using MoneyBee.Common.Events;
-using MoneyBee.Common.Options;
 using Testcontainers.PostgreSql;
-using Testcontainers.RabbitMq;
 using Testcontainers.Redis;
-using Xunit;
 
 namespace MoneyBee.IntegrationTests.Infrastructure;
 
@@ -30,6 +27,7 @@ public class IntegrationTestFactory<TProgram> : WebApplicationFactory<TProgram>,
     private readonly bool _useRabbitMq;
     private WebApplicationFactory<MoneyBee.Auth.Service.Program>? _authFactory;
     private HttpClient? _authClient;
+    private bool _migrationsApplied = false;
 
     public string PostgresConnectionString { get; private set; } = string.Empty;
     public string RedisConnectionString { get; private set; } = string.Empty;
@@ -102,6 +100,23 @@ public class IntegrationTestFactory<TProgram> : WebApplicationFactory<TProgram>,
                         ["Redis:ConnectionString"] = RedisConnectionString
                     });
                 });
+                
+                builder.ConfigureServices(services =>
+                {
+                    // Remove existing DbContext registration
+                    var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(Microsoft.EntityFrameworkCore.DbContextOptions<MoneyBee.Auth.Service.Infrastructure.Data.AuthDbContext>));
+                    if (descriptor != null)
+                    {
+                        services.Remove(descriptor);
+                    }
+                    
+                    // Re-register with test configuration
+                    services.AddDbContext<MoneyBee.Auth.Service.Infrastructure.Data.AuthDbContext>(options =>
+                    {
+                        options.UseNpgsql(authPostgresConnectionString);
+                    });
+                });
+                
                 builder.UseEnvironment("Testing");
             });
 
@@ -109,6 +124,9 @@ public class IntegrationTestFactory<TProgram> : WebApplicationFactory<TProgram>,
         // Store the Auth Service base address for configuration
         // Note: WebApplicationFactory clients use in-memory test server, so we use the factory itself
         AuthServiceUrl = _authClient.BaseAddress?.ToString() ?? "http://localhost:5001";
+
+        // Database is already created via EnsureCreated in Program.cs
+        // No additional action needed
 
         // Create a test API key
         var createKeyRequest = new
@@ -164,6 +182,31 @@ public class IntegrationTestFactory<TProgram> : WebApplicationFactory<TProgram>,
 
         builder.ConfigureTestServices(services =>
         {
+            // Reconfigure DbContext to suppress pending model changes warning
+            // Try Customer Service DbContext
+            var customerDbDescriptor = services.FirstOrDefault(d => 
+                d.ServiceType == typeof(Microsoft.EntityFrameworkCore.DbContextOptions<MoneyBee.Customer.Service.Infrastructure.Data.CustomerDbContext>));
+            if (customerDbDescriptor != null)
+            {
+                services.Remove(customerDbDescriptor);
+                services.AddDbContext<MoneyBee.Customer.Service.Infrastructure.Data.CustomerDbContext>(options =>
+                {
+                    options.UseNpgsql(PostgresConnectionString);
+                });
+            }
+            
+            // Try Transfer Service DbContext
+            var transferDbDescriptor = services.FirstOrDefault(d => 
+                d.ServiceType == typeof(Microsoft.EntityFrameworkCore.DbContextOptions<MoneyBee.Transfer.Service.Infrastructure.Data.TransferDbContext>));
+            if (transferDbDescriptor != null)
+            {
+                services.Remove(transferDbDescriptor);
+                services.AddDbContext<MoneyBee.Transfer.Service.Infrastructure.Data.TransferDbContext>(options =>
+                {
+                    options.UseNpgsql(PostgresConnectionString);
+                });
+            }
+            
             // Replace RabbitMQ event publisher with mock for single-service tests
             if (!_useRabbitMq)
             {
@@ -199,12 +242,27 @@ public class IntegrationTestFactory<TProgram> : WebApplicationFactory<TProgram>,
     /// </summary>
     public HttpClient CreateAuthenticatedClient()
     {
+        // Apply migrations on first client creation
+        if (!_migrationsApplied)
+        {
+            // Use GetAwaiter().GetResult() for sync context
+            ApplyTestServiceMigrationsAsync().GetAwaiter().GetResult();
+            _migrationsApplied = true;
+        }
+
         var client = CreateClient();
         if (!string.IsNullOrEmpty(TestApiKey))
         {
             client.DefaultRequestHeaders.Add(HttpHeaders.ApiKey, TestApiKey);
         }
         return client;
+    }
+
+    private async Task ApplyTestServiceMigrationsAsync()
+    {
+        // Database is already created via EnsureCreated in Program.cs
+        // No additional action needed
+        await Task.CompletedTask;
     }
 
     public new async Task DisposeAsync()

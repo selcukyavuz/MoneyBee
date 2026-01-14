@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MoneyBee.Customer.Service.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(CustomerDbContext))]
-    [Migration("20260110123556_Add_OutboxMessages_Table")]
-    partial class Add_OutboxMessages_Table
+    [Migration("20260114171325_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -25,61 +25,7 @@ namespace MoneyBee.Customer.Service.Infrastructure.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("MoneyBee.Common.Persistence.OutboxMessage", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("EventData")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("event_data");
-
-                    b.Property<string>("EventType")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("event_type");
-
-                    b.Property<DateTime?>("LastAttemptAt")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("last_attempt_at");
-
-                    b.Property<string>("LastError")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("last_error");
-
-                    b.Property<DateTime>("OccurredOn")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("occurred_on");
-
-                    b.Property<int>("ProcessAttempts")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("process_attempts");
-
-                    b.Property<bool>("Published")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("published");
-
-                    b.Property<DateTime?>("PublishedAt")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("published_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Published", "OccurredOn")
-                        .HasDatabaseName("ix_outbox_messages_published_occurred");
-
-                    b.ToTable("outbox_messages", (string)null);
-                });
-
-            modelBuilder.Entity("MoneyBee.Customer.Service.Domain.Entities.Customer", b =>
+            modelBuilder.Entity("MoneyBee.Customer.Service.Domain.Customers.Customer", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
