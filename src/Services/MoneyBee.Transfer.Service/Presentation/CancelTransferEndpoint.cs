@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using MoneyBee.Common.Models;
-using MoneyBee.Transfer.Service.Application.Transfers;
-using MoneyBee.Transfer.Service.Application.Transfers;
+using MoneyBee.Transfer.Service.Application.Transfers.Commands.CancelTransfer;
+using MoneyBee.Transfer.Service.Application.Transfers.Shared;
 using MoneyBee.Web.Common.Extensions;
 
 namespace MoneyBee.Transfer.Service.Presentation;
@@ -26,12 +26,12 @@ public static class CancelTransferEndpoint
     private static async Task<IResult> HandleAsync(
         string code,
         [FromBody] CancelTransferRequest request,
-        ITransferService transferService,
+        CancelTransferHandler handler,
         ILogger<Program> logger)
     {
         try
         {
-            var result = await transferService.CancelTransferAsync(code, request);
+            var result = await handler.HandleAsync((code, request));
 
             if (!result.IsSuccess)
                 return result.ToHttpResult();

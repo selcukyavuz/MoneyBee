@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using MoneyBee.Common.Abstractions;
 using MoneyBee.Common.Constants;
 using System.Text.Json;
 
@@ -8,41 +9,31 @@ namespace MoneyBee.Common.Middleware;
 /// <summary>
 /// Middleware for API key authentication across all services
 /// </summary>
-public class ApiKeyAuthenticationMiddleware
+public class ApiKeyAuthenticationMiddleware(
+    RequestDelegate next,
+    ILogger<ApiKeyAuthenticationMiddleware> logger)
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<ApiKeyAuthenticationMiddleware> _logger;
-
-    public ApiKeyAuthenticationMiddleware(
-        RequestDelegate next,
-        ILogger<ApiKeyAuthenticationMiddleware> logger)
+    public async Task InvokeAsync(HttpContext context, IApiKeyValidator apiKeyValidator)
     {
-        _next = next;
-        _logger = logger;
-    }
-
-    public async Task InvokeAsync(HttpContext context, Services.IApiKeyValidator apiKeyValidator)
-    {
-        // Skip authentication for health check, metrics, and swagger endpoints
+        // Skip authentication for health check, and swagger endpoints
         var path = context.Request.Path.Value?.ToLower() ?? "";
-        if (path == "/health" || 
-            path == "/metrics" ||
-            path.StartsWith("/swagger") || 
-            (path.Contains("/api/auth/keys") && context.Request.Method == "POST") || // Allow creating API key in Auth Service
-            (path.Contains("/apikeys") && context.Request.Method == "POST")) // Allow creating first API key
+        if (path == ApiKeyAuthenticationMiddlewareConstants.HealthCheckPath || 
+            path.StartsWith(ApiKeyAuthenticationMiddlewareConstants.SwaggerPathPrefix) || 
+            (path.Contains(ApiKeyAuthenticationMiddlewareConstants.AuthServiceKeysPath) && context.Request.Method == ApiKeyAuthenticationMiddlewareConstants.PostMethod) ||
+            (path.Contains(ApiKeyAuthenticationMiddlewareConstants.ApiKeysPath) && context.Request.Method == ApiKeyAuthenticationMiddlewareConstants.PostMethod))
         {
-            await _next(context);
+            await next(context);
             return;
         }
 
         // Extract API Key from header
         if (!context.Request.Headers.TryGetValue(HttpHeaders.ApiKey, out var extractedApiKey))
         {
-            _logger.LogWarning("API Key missing from request to {Path} from {IpAddress}", 
+            logger.LogWarning(ApiKeyAuthenticationMiddlewareConstants.ApiKeyMissingLogMessage, 
                 context.Request.Path, context.Connection.RemoteIpAddress);
             context.Response.StatusCode = 401;
-            context.Response.ContentType = "application/json";
-            await context.Response.WriteAsync(JsonSerializer.Serialize(new { error = "API Key is missing" }));
+            context.Response.ContentType = ApiKeyAuthenticationMiddlewareConstants.JsonContentType;
+            await context.Response.WriteAsync(JsonSerializer.Serialize(new { error = ApiKeyAuthenticationMiddlewareConstants.ApiKeyMissingError }));
             return;
         }
 
@@ -50,13 +41,13 @@ public class ApiKeyAuthenticationMiddleware
 
         // Validate API Key format (must start with mb_ and have reasonable length)
         if (string.IsNullOrWhiteSpace(apiKey) || 
-            !apiKey.StartsWith("mb_") || 
-            apiKey.Length < 20)
+            !apiKey.StartsWith(ApiKeyAuthenticationMiddlewareConstants.ApiKeyPrefix) || 
+            apiKey.Length < ApiKeyAuthenticationMiddlewareConstants.MinApiKeyLength)
         {
-            _logger.LogWarning("Invalid API Key format from {IpAddress}", context.Connection.RemoteIpAddress);
+            logger.LogWarning(ApiKeyAuthenticationMiddlewareConstants.InvalidFormatLogMessage, context.Connection.RemoteIpAddress);
             context.Response.StatusCode = 401;
-            context.Response.ContentType = "application/json";
-            await context.Response.WriteAsync(JsonSerializer.Serialize(new { error = "Invalid API Key format" }));
+            context.Response.ContentType = ApiKeyAuthenticationMiddlewareConstants.JsonContentType;
+            await context.Response.WriteAsync(JsonSerializer.Serialize(new { error = ApiKeyAuthenticationMiddlewareConstants.InvalidApiKeyFormatError }));
             return;
         }
 
@@ -65,15 +56,15 @@ public class ApiKeyAuthenticationMiddleware
 
         if (!isValid)
         {
-            _logger.LogWarning("Invalid API Key attempt from {IpAddress} for path {Path}", 
+            logger.LogWarning(ApiKeyAuthenticationMiddlewareConstants.InvalidAttemptLogMessage, 
                 context.Connection.RemoteIpAddress, context.Request.Path);
             context.Response.StatusCode = 401;
-            context.Response.ContentType = "application/json";
-            await context.Response.WriteAsync(JsonSerializer.Serialize(new { error = "Invalid or expired API Key" }));
+            context.Response.ContentType = ApiKeyAuthenticationMiddlewareConstants.JsonContentType;
+            await context.Response.WriteAsync(JsonSerializer.Serialize(new { error = ApiKeyAuthenticationMiddlewareConstants.InvalidOrExpiredApiKeyError }));
             return;
         }
 
-        _logger.LogDebug("API Key validated successfully for path {Path}", context.Request.Path);
-        await _next(context);
+        logger.LogDebug(ApiKeyAuthenticationMiddlewareConstants.ValidatedSuccessfullyLogMessage, context.Request.Path);
+        await next(context);
     }
 }

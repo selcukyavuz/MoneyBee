@@ -1,5 +1,5 @@
-using System.ComponentModel.DataAnnotations;
 using MoneyBee.Common.Enums;
+using MoneyBee.Common.Results;
 
 namespace MoneyBee.Transfer.Service.Domain.Transfers;
 
@@ -11,37 +11,31 @@ public class Transfer
     /// <summary>
     /// Gets the unique identifier of the transfer
     /// </summary>
-    [Key]
     public Guid Id { get; private set; }
 
     /// <summary>
     /// Gets the sender customer's unique identifier
     /// </summary>
-    [Required]
     public Guid SenderId { get; private set; }
 
     /// <summary>
     /// Gets the receiver customer's unique identifier
     /// </summary>
-    [Required]
     public Guid ReceiverId { get; private set; }
 
     /// <summary>
     /// Gets the transfer amount in original currency
     /// </summary>
-    [Required]
     public decimal Amount { get; private set; }
 
     /// <summary>
     /// Gets the currency of the transfer
     /// </summary>
-    [Required]
     public Currency Currency { get; private set; }
 
     /// <summary>
     /// Gets the transfer amount converted to TRY for limit checks
     /// </summary>
-    [Required]
     public decimal AmountInTRY { get; private set; }
 
     /// <summary>
@@ -52,20 +46,16 @@ public class Transfer
     /// <summary>
     /// Gets the transaction fee charged
     /// </summary>
-    [Required]
     public decimal TransactionFee { get; private set; }
 
     /// <summary>
     /// Gets the 8-digit transaction code for completing the transfer
     /// </summary>
-    [Required]
-    [MaxLength(10)]
     public string TransactionCode { get; private set; } = string.Empty;
 
     /// <summary>
     /// Gets the current status of the transfer
     /// </summary>
-    [Required]
     public TransferStatus Status { get; private set; }
 
     /// <summary>
@@ -76,13 +66,11 @@ public class Transfer
     /// <summary>
     /// Gets the idempotency key for preventing duplicate transfers
     /// </summary>
-    [MaxLength(100)]
     public string? IdempotencyKey { get; private set; }
 
     /// <summary>
     /// Row version for optimistic concurrency control
     /// </summary>
-    [Timestamp]
     public byte[]? RowVersion { get; private set; }
 
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
@@ -207,5 +195,81 @@ public class Transfer
     public bool IsHighValue()
     {
         return AmountInTRY > 1000m;
+    }
+
+    /// <summary>
+    /// Validates if this transfer can be completed by the given receiver
+    /// </summary>
+    public Result ValidateForCompletion(string receiverNationalId)
+    {
+        if (Status != TransferStatus.Pending)
+            return Result.Failure($"Transfer cannot be completed. Status: {Status}");
+
+        if (ReceiverNationalId != receiverNationalId)
+            return Result.Failure("Receiver identity verification failed");
+
+        if (RequiresApproval())
+        {
+            var remainingMinutes = (ApprovalRequiredUntil!.Value - DateTime.UtcNow).TotalMinutes;
+            return Result.Failure(
+                $"Transfer approval required. Please wait {Math.Ceiling(remainingMinutes)} more minute(s)");
+        }
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Checks if the transfer amount would exceed the daily limit
+    /// </summary>
+    public static Result ValidateDailyLimit(decimal currentDailyTotal, decimal newAmount, decimal dailyLimit)
+    {
+        var remainingLimit = dailyLimit - currentDailyTotal;
+        
+        if (remainingLimit < newAmount)
+            return Result.Failure($"Daily transfer limit exceeded. Remaining: {remainingLimit:F2} TRY");
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Determines if transfer should be rejected based on fraud risk level
+    /// </summary>
+    public bool ShouldBeRejectedDueToFraud()
+    {
+        return RiskLevel == Common.Enums.RiskLevel.High;
+    }
+
+    /// <summary>
+    /// Checks if approval wait is required for this transfer amount
+    /// </summary>
+    public static bool RequiresApprovalWait(decimal amountInTRY, decimal highAmountThreshold)
+    {
+        return amountInTRY > highAmountThreshold;
+    }
+
+    /// <summary>
+    /// Calculates when approval wait will expire
+    /// </summary>
+    public static DateTime? CalculateApprovalWaitTime(decimal amountInTRY, decimal highAmountThreshold, int approvalWaitMinutes)
+    {
+        if (!RequiresApprovalWait(amountInTRY, highAmountThreshold))
+            return null;
+
+        return DateTime.UtcNow.AddMinutes(approvalWaitMinutes);
+    }
+
+    /// <summary>
+    /// Calculates the transaction fee based on transfer amount
+    /// Fee structure: Base fee + percentage of transfer amount
+    /// </summary>
+    /// <param name="amountInTRY">The transfer amount in TRY</param>
+    /// <param name="baseFee">Base fee to apply</param>
+    /// <param name="feePercentage">Percentage fee (e.g., 0.01 for 1%)</param>
+    /// <returns>Total fee rounded to 2 decimal places</returns>
+    public static decimal CalculateFee(decimal amountInTRY, decimal baseFee, decimal feePercentage)
+    {
+        var percentageFee = amountInTRY * feePercentage;
+        var totalFee = baseFee + percentageFee;
+        return Math.Round(totalFee, 2);
     }
 }

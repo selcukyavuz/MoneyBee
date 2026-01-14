@@ -1,68 +1,12 @@
-using Polly;
-using Polly.CircuitBreaker;
 using System.Text.Json;
+using MoneyBee.Customer.Service.Domain.Services;
 
 namespace MoneyBee.Customer.Service.Infrastructure.ExternalServices;
 
-/// <summary>
-/// Service interface for KYC (Know Your Customer) verification with external KYC provider
-/// </summary>
-public interface IKycService
-{
-    /// <summary>
-    /// Verifies customer identity with external KYC service
-    /// </summary>
-    /// <param name="nationalId">The customer's national ID</param>
-    /// <param name="firstName">The customer's first name</param>
-    /// <param name="lastName">The customer's last name</param>
-    /// <param name="dateOfBirth">The customer's date of birth</param>
-    /// <returns>KYC verification result with verification status and risk score</returns>
-    Task<KycVerificationResult> VerifyCustomerAsync(string nationalId, string firstName, string lastName, DateTime dateOfBirth);
-}
-
-/// <summary>
-/// Represents the result of a KYC verification check
-/// </summary>
-public class KycVerificationResult
-{
-    public bool IsVerified { get; set; }
-    public string Message { get; set; } = string.Empty;
-    public string? RiskScore { get; set; }
-}
-
 public class KycService(
-    IHttpClientFactory httpClientFactory,
-    ILogger<KycService> logger,
-    IConfiguration configuration) : IKycService
+    HttpClient httpClient,
+    ILogger<KycService> logger) : IKycService
 {
-    private readonly HttpClient httpClient = CreateHttpClient(httpClientFactory, configuration);
-    private readonly AsyncCircuitBreakerPolicy circuitBreakerPolicy = CreateCircuitBreakerPolicy(logger);
-
-    private static HttpClient CreateHttpClient(IHttpClientFactory httpClientFactory, IConfiguration configuration)
-    {
-        var httpClient = httpClientFactory.CreateClient("KycService");
-        httpClient.BaseAddress = new Uri(configuration[MoneyBee.Common.Constants.ConfigurationKeys.ExternalServices.KycService] ?? "http://kyc-service");
-        return httpClient;
-    }
-
-    private static AsyncCircuitBreakerPolicy CreateCircuitBreakerPolicy(ILogger<KycService> logger)
-    {
-        // Circuit breaker: Open after 3 failures, stay open for 30 seconds
-        return Policy
-            .Handle<HttpRequestException>()
-            .CircuitBreakerAsync(
-                exceptionsAllowedBeforeBreaking: 3,
-                durationOfBreak: TimeSpan.FromSeconds(30),
-                onBreak: (exception, duration) =>
-                {
-                    logger.LogWarning("KYC Service circuit breaker opened for {Duration}s", duration.TotalSeconds);
-                },
-                onReset: () =>
-                {
-                    logger.LogInformation("KYC Service circuit breaker reset");
-                });
-    }
-
     public async Task<KycVerificationResult> VerifyCustomerAsync(
         string nationalId,
         string firstName,
@@ -71,53 +15,40 @@ public class KycService(
     {
         try
         {
-            return await circuitBreakerPolicy.ExecuteAsync(async () =>
+            var request = new
             {
-                var request = new
-                {
-                    nationalId,
-                    firstName,
-                    lastName,
-                    dateOfBirth = dateOfBirth.ToString("yyyy-MM-dd")
-                };
+                nationalId,
+                firstName,
+                lastName,
+                dateOfBirth = dateOfBirth.ToString("yyyy-MM-dd")
+            };
 
-                logger.LogInformation("Calling KYC Service for customer verification: {NationalId}", nationalId);
+            logger.LogInformation("Calling KYC Service for customer verification: {NationalId}", nationalId);
 
-                var response = await httpClient.PostAsJsonAsync("/api/kyc/verify", request);
+            var response = await httpClient.PostAsJsonAsync("/api/kyc/verify", request);
 
-                if (!response.IsSuccessStatusCode)
-                {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    logger.LogWarning("KYC Service returned error: {StatusCode} - {Content}",
-                        response.StatusCode, errorContent);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                logger.LogWarning("KYC Service returned error: {StatusCode} - {Content}",
+                    response.StatusCode, errorContent);
 
-                    // Don't fail the request, return unverified
-                    return new KycVerificationResult
-                    {
-                        IsVerified = false,
-                        Message = "KYC verification service unavailable"
-                    };
-                }
-
-                var result = await response.Content.ReadFromJsonAsync<KycVerificationResult>();
-                
-                logger.LogInformation("KYC verification result for {NationalId}: {IsVerified}",
-                    nationalId, result?.IsVerified ?? false);
-
-                return result ?? new KycVerificationResult
+                return new KycVerificationResult
                 {
                     IsVerified = false,
-                    Message = "Invalid response from KYC service"
+                    Message = "KYC verification service unavailable"
                 };
-            });
-        }
-        catch (BrokenCircuitException)
-        {
-            logger.LogError("KYC Service circuit breaker is open");
-            return new KycVerificationResult
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<KycVerificationResult>();
+            
+            logger.LogInformation("KYC verification result for {NationalId}: {IsVerified}",
+                nationalId, result?.IsVerified ?? false);
+
+            return result ?? new KycVerificationResult
             {
                 IsVerified = false,
-                Message = "KYC service temporarily unavailable"
+                Message = "Invalid response from KYC service"
             };
         }
         catch (Exception ex)

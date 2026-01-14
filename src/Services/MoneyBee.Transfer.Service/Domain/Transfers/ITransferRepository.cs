@@ -27,6 +27,13 @@ public interface ITransferRepository
     /// <param name="idempotencyKey">The idempotency key</param>
     /// <returns>The transfer entity if found, null otherwise</returns>
     Task<TransferEntity?> GetByIdempotencyKeyAsync(string idempotencyKey);
+
+    /// <summary>
+    /// Gets all pending transfers for a specific customer (as sender or receiver)
+    /// </summary>
+    /// <param name="customerId">The customer's unique identifier</param>
+    /// <returns>List of pending transfers</returns>
+    Task<IEnumerable<TransferEntity>> GetPendingByCustomerIdAsync(Guid customerId);
     
     /// <summary>
     /// Gets all transfers for a specific customer

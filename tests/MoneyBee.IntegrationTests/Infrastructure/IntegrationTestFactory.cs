@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using MoneyBee.Common.Constants;
 using MoneyBee.Common.Events;
+using MoneyBee.Common.Options;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
 using Testcontainers.Redis;
@@ -168,24 +169,24 @@ public class IntegrationTestFactory<TProgram> : WebApplicationFactory<TProgram>,
             {
                 // Remove real EventPublisher (Customer Service)
                 var eventPublisherDescriptor = services.FirstOrDefault(d => 
-                    d.ServiceType == typeof(MoneyBee.Customer.Service.Infrastructure.Messaging.IEventPublisher));
+                    d.ServiceType == typeof(MoneyBee.Common.Abstractions.IEventPublisher));
                 if (eventPublisherDescriptor != null)
                 {
                     services.Remove(eventPublisherDescriptor);
                 }
 
                 // Add mock EventPublisher
-                services.AddSingleton<MoneyBee.Customer.Service.Infrastructure.Messaging.IEventPublisher, MockEventPublisher>();
+                services.AddSingleton<MoneyBee.Common.Abstractions.IEventPublisher, MockEventPublisher>();
             }
 
             // Replace Auth Service HTTP client with the one that uses WebApplicationFactory
             // This allows the test services to call the Auth Service test instance
-            services.RemoveAll<MoneyBee.Common.Services.IApiKeyValidator>();
-            services.AddSingleton<MoneyBee.Common.Services.IApiKeyValidator>(sp => 
-                new MoneyBee.Common.Services.CachedApiKeyValidator(
+            services.RemoveAll<MoneyBee.Common.Abstractions.IApiKeyValidator>();
+            services.AddSingleton<MoneyBee.Common.Abstractions.IApiKeyValidator>(sp => 
+                new MoneyBee.Common.Infrastructure.Caching.CachedApiKeyValidator(
                     sp.GetRequiredService<Microsoft.Extensions.Caching.Distributed.IDistributedCache>(),
                     _authClient ?? throw new InvalidOperationException("Auth client not initialized"),
-                    sp.GetRequiredService<ILogger<MoneyBee.Common.Services.CachedApiKeyValidator>>()
+                    sp.GetRequiredService<ILogger<MoneyBee.Common.Infrastructure.Caching.CachedApiKeyValidator>>()
                 )
             );
         });
@@ -232,7 +233,7 @@ public class IntegrationTestFactory<TProgram> : WebApplicationFactory<TProgram>,
 /// Mock EventPublisher for integration tests
 /// Doesn't require RabbitMQ connection
 /// </summary>
-public class MockEventPublisher : MoneyBee.Customer.Service.Infrastructure.Messaging.IEventPublisher
+public class MockEventPublisher : MoneyBee.Common.Abstractions.IEventPublisher
 {
     private readonly ILogger<MockEventPublisher> _logger;
     private readonly List<object> _publishedEvents = new();

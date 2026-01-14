@@ -1,6 +1,6 @@
 using MoneyBee.Common.Models;
-using MoneyBee.Transfer.Service.Application.Transfers;
-using MoneyBee.Transfer.Service.Application.Transfers;
+using MoneyBee.Transfer.Service.Application.Transfers.Queries.GetCustomerTransfers;
+using MoneyBee.Transfer.Service.Application.Transfers.Shared;
 
 namespace MoneyBee.Transfer.Service.Presentation;
 
@@ -21,9 +21,9 @@ public static class GetCustomerTransfersEndpoint
 
     private static async Task<IResult> HandleAsync(
         Guid customerId,
-        ITransferService transferService)
+        GetCustomerTransfersHandler handler)
     {
-        var dtos = await transferService.GetCustomerTransfersAsync(customerId);
+        var dtos = await handler.HandleAsync(customerId);
         return Results.Ok(ApiResponse<List<TransferDto>>.SuccessResponse(dtos.ToList()));
     }
 }

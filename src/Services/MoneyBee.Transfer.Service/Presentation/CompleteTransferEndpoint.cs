@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using MoneyBee.Common.Models;
-using MoneyBee.Transfer.Service.Application.Transfers;
-using MoneyBee.Transfer.Service.Application.Transfers;
+using MoneyBee.Transfer.Service.Application.Transfers.Commands.CompleteTransfer;
+using MoneyBee.Transfer.Service.Application.Transfers.Shared;
 using MoneyBee.Web.Common.Extensions;
 
 namespace MoneyBee.Transfer.Service.Presentation;
@@ -26,12 +26,12 @@ public static class CompleteTransferEndpoint
     private static async Task<IResult> HandleAsync(
         string code,
         [FromBody] CompleteTransferRequest request,
-        ITransferService transferService,
+        CompleteTransferHandler handler,
         ILogger<Program> logger)
     {
         try
         {
-            var result = await transferService.CompleteTransferAsync(code, request);
+            var result = await handler.HandleAsync((code, request));
 
             if (!result.IsSuccess)
                 return result.ToHttpResult();

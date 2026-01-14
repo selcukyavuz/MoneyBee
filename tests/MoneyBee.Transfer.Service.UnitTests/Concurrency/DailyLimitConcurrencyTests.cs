@@ -1,6 +1,5 @@
 using FluentAssertions;
 using MoneyBee.Transfer.Service.Domain.Transfers;
-using MoneyBee.Transfer.Service.Domain.Transfers;
 using Moq;
 using System.Collections.Concurrent;
 

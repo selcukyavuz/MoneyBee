@@ -1,5 +1,5 @@
 using FluentAssertions;
-using MoneyBee.Customer.Service.Helpers;
+using MoneyBee.Customer.Service.Domain.Customers;
 
 namespace MoneyBee.Customer.Service.UnitTests.Helpers;
 

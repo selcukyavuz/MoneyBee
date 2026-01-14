@@ -5,6 +5,9 @@ using TransferEntity = MoneyBee.Transfer.Service.Domain.Transfers.Transfer;
 
 namespace MoneyBee.Transfer.Service.UnitTests.Domain.Transfers;
 
+/// <summary>
+/// Tests for Transfer entity business rules and validation methods
+/// </summary>
 public class TransferValidatorTests
 {
 
@@ -21,7 +24,7 @@ public class TransferValidatorTests
         const decimal highAmountThreshold = 1000m;
 
         // Act
-        var requiresApproval = TransferValidator.RequiresApprovalWait(amount, highAmountThreshold);
+        var requiresApproval = TransferEntity.RequiresApprovalWait(amount, highAmountThreshold);
 
         // Assert
         requiresApproval.Should().Be(expected);
@@ -37,7 +40,7 @@ public class TransferValidatorTests
         var beforeCalculation = DateTime.UtcNow;
 
         // Act
-        var approvalTime = TransferValidator.CalculateApprovalWaitTime(highAmount, highAmountThreshold, approvalWaitMinutes);
+        var approvalTime = TransferEntity.CalculateApprovalWaitTime(highAmount, highAmountThreshold, approvalWaitMinutes);
 
         // Assert
         approvalTime.Should().NotBeNull();
@@ -53,14 +56,14 @@ public class TransferValidatorTests
         const int approvalWaitMinutes = 5;
 
         // Act
-        var approvalTime = TransferValidator.CalculateApprovalWaitTime(lowAmount, highAmountThreshold, approvalWaitMinutes);
+        var approvalTime = TransferEntity.CalculateApprovalWaitTime(lowAmount, highAmountThreshold, approvalWaitMinutes);
 
         // Assert
         approvalTime.Should().BeNull();
     }
 
     [Fact]
-    public void ValidateTransferForCompletion_WithValidPendingTransfer_ShouldNotThrow()
+    public void ValidateForCompletion_WithValidPendingTransfer_ShouldSucceed()
     {
         // Arrange
         var transfer = TransferEntity.Create(
@@ -80,14 +83,14 @@ public class TransferValidatorTests
         );
 
         // Act
-        var result = TransferValidator.ValidateTransferForCompletion(transfer, "98765432109");
+        var result = transfer.ValidateForCompletion("98765432109");
 
         // Assert
         result.IsSuccess.Should().BeTrue();
     }
 
     [Fact]
-    public void ValidateTransferForCompletion_WithCompletedTransfer_ShouldThrow()
+    public void ValidateForCompletion_WithCompletedTransfer_ShouldFail()
     {
         // Arrange
         var transfer = TransferEntity.Create(
@@ -109,7 +112,7 @@ public class TransferValidatorTests
         transfer.Complete();
 
         // Act
-        var result = TransferValidator.ValidateTransferForCompletion(transfer, "98765432109");
+        var result = transfer.ValidateForCompletion("98765432109");
 
         // Assert
         result.IsSuccess.Should().BeFalse();
@@ -117,7 +120,7 @@ public class TransferValidatorTests
     }
 
     [Fact]
-    public void ValidateTransferForCompletion_WithWrongReceiver_ShouldThrow()
+    public void ValidateForCompletion_WithWrongReceiver_ShouldFail()
     {
         // Arrange
         var transfer = TransferEntity.Create(
@@ -137,7 +140,7 @@ public class TransferValidatorTests
         );
 
         // Act
-        var result = TransferValidator.ValidateTransferForCompletion(transfer, "11111111111");
+        var result = transfer.ValidateForCompletion("11111111111");
 
         // Assert
         result.IsSuccess.Should().BeFalse();
@@ -145,7 +148,7 @@ public class TransferValidatorTests
     }
 
     [Fact]
-    public void ValidateDailyLimit_WithinLimit_ShouldNotThrow()
+    public void ValidateDailyLimit_WithinLimit_ShouldSucceed()
     {
         // Arrange
         var currentTotal = 5000m;
@@ -153,14 +156,14 @@ public class TransferValidatorTests
         var dailyLimit = 10000m;
 
         // Act
-        var result = TransferValidator.ValidateDailyLimit(currentTotal, newAmount, dailyLimit);
+        var result = TransferEntity.ValidateDailyLimit(currentTotal, newAmount, dailyLimit);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
     }
 
     [Fact]
-    public void ValidateDailyLimit_ExceedingLimit_ShouldThrow()
+    public void ValidateDailyLimit_ExceedingLimit_ShouldFail()
     {
         // Arrange
         var currentTotal = 8000m;
@@ -168,7 +171,7 @@ public class TransferValidatorTests
         var dailyLimit = 10000m;
 
         // Act
-        var result = TransferValidator.ValidateDailyLimit(currentTotal, newAmount, dailyLimit);
+        var result = TransferEntity.ValidateDailyLimit(currentTotal, newAmount, dailyLimit);
 
         // Assert
         result.IsSuccess.Should().BeFalse();
@@ -176,7 +179,7 @@ public class TransferValidatorTests
     }
 
     [Fact]
-    public void ValidateDailyLimit_ExactlyAtLimit_ShouldNotThrow()
+    public void ValidateDailyLimit_ExactlyAtLimit_ShouldSucceed()
     {
         // Arrange
         var currentTotal = 7000m;
@@ -184,21 +187,64 @@ public class TransferValidatorTests
         var dailyLimit = 10000m;
 
         // Act
-        var result = TransferValidator.ValidateDailyLimit(currentTotal, newAmount, dailyLimit);
+        var result = TransferEntity.ValidateDailyLimit(currentTotal, newAmount, dailyLimit);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
     }
 
+    [Fact]
+    public void ShouldBeRejectedDueToFraud_WithHighRisk_ShouldReturnTrue()
+    {
+        // Arrange
+        var transfer = TransferEntity.Create(
+            senderId: Guid.NewGuid(),
+            receiverId: Guid.NewGuid(),
+            amount: 500m,
+            currency: Currency.TRY,
+            amountInTRY: 500m,
+            exchangeRate: null,
+            transactionFee: 0m,
+            transactionCode: "TXN123456",
+            riskLevel: RiskLevel.High,
+            idempotencyKey: null,
+            approvalRequiredUntil: null,
+            senderNationalId: "12345678901",
+            receiverNationalId: "98765432109"
+        );
+
+        // Act
+        var shouldReject = transfer.ShouldBeRejectedDueToFraud();
+
+        // Assert
+        shouldReject.Should().BeTrue();
+    }
+
     [Theory]
     [InlineData(RiskLevel.Low, false)]
     [InlineData(RiskLevel.Medium, false)]
-    [InlineData(RiskLevel.High, true)]
     [InlineData(null, false)]
-    public void ShouldRejectTransfer_WithVariousRiskLevels_ShouldReturnCorrectResult(RiskLevel? riskLevel, bool expected)
+    public void ShouldBeRejectedDueToFraud_WithLowOrMediumRisk_ShouldReturnFalse(RiskLevel? riskLevel, bool expected)
     {
+        // Arrange
+        var transfer = TransferEntity.Create(
+            senderId: Guid.NewGuid(),
+            receiverId: Guid.NewGuid(),
+            amount: 500m,
+            currency: Currency.TRY,
+            amountInTRY: 500m,
+            exchangeRate: null,
+            transactionFee: 0m,
+            transactionCode: "TXN123456",
+            riskLevel: riskLevel,
+            idempotencyKey: null,
+            approvalRequiredUntil: null,
+            senderNationalId: "12345678901",
+            receiverNationalId: "98765432109"
+        );
+
         // Act
-        var shouldReject = TransferValidator.ShouldRejectTransfer(riskLevel);
+        var shouldReject = transfer.ShouldBeRejectedDueToFraud();
 
         // Assert
         shouldReject.Should().Be(expected);

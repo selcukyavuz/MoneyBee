@@ -1,6 +1,6 @@
 using FluentValidation;
-using MoneyBee.Customer.Service.Application.Customers;
-using MoneyBee.Customer.Service.Helpers;
+using MoneyBee.Customer.Service.Application.Customers.Commands.CreateCustomer;
+using MoneyBee.Customer.Service.Domain.Customers;
 
 namespace MoneyBee.Customer.Service.Application.Customers;
 

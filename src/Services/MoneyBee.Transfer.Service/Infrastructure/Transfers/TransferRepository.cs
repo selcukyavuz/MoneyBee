@@ -69,4 +69,12 @@ public class TransferRepository : ITransferRepository
     {
         return await _context.Transfers.AnyAsync(t => t.TransactionCode == transactionCode);
     }
+
+    public async Task<IEnumerable<TransferEntity>> GetPendingByCustomerIdAsync(Guid customerId)
+    {
+        return await _context.Transfers
+            .Where(t => (t.SenderId == customerId || t.ReceiverId == customerId)
+                     && t.Status == TransferStatus.Pending)
+            .ToListAsync();
+    }
 }

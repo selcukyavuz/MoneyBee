@@ -1,6 +1,6 @@
 using MoneyBee.Common.Models;
-using MoneyBee.Transfer.Service.Application.Transfers;
-using MoneyBee.Transfer.Service.Application.Transfers;
+using MoneyBee.Transfer.Service.Application.Transfers.Queries.GetTransferByCode;
+using MoneyBee.Transfer.Service.Application.Transfers.Shared;
 using MoneyBee.Web.Common.Extensions;
 
 namespace MoneyBee.Transfer.Service.Presentation;
@@ -23,9 +23,9 @@ public static class GetTransferByCodeEndpoint
 
     private static async Task<IResult> HandleAsync(
         string code,
-        ITransferService transferService)
+        GetTransferByCodeHandler handler)
     {
-        var result = await transferService.GetTransferByCodeAsync(code);
+        var result = await handler.HandleAsync(code);
         return result.ToHttpResult();
     }
 }

@@ -1,6 +1,5 @@
 using MoneyBee.Common.Models;
-using MoneyBee.Transfer.Service.Application.Transfers;
-using MoneyBee.Transfer.Service.Application.Transfers;
+using MoneyBee.Transfer.Service.Application.Transfers.Queries.CheckDailyLimit;
 
 namespace MoneyBee.Transfer.Service.Presentation;
 
@@ -21,9 +20,9 @@ public static class CheckDailyLimitEndpoint
 
     private static async Task<IResult> HandleAsync(
         Guid customerId,
-        ITransferService transferService)
+        CheckDailyLimitHandler handler)
     {
-        var limitInfo = await transferService.CheckDailyLimitAsync(customerId);
+        var limitInfo = await handler.HandleAsync(customerId);
         return Results.Ok(ApiResponse<DailyLimitCheckResponse>.SuccessResponse(limitInfo));
     }
 }

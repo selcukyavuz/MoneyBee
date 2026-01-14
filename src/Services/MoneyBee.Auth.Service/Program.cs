@@ -1,13 +1,13 @@
 using Microsoft.EntityFrameworkCore;
-using MoneyBee.Auth.Service.Application.Interfaces;
-using MoneyBee.Auth.Service.Application.Services;
+using MoneyBee.Auth.Service.Application.ApiKeys;
 using MoneyBee.Auth.Service.Domain.ApiKeys;
-using MoneyBee.Auth.Service.Presentation;
+using MoneyBee.Auth.Service.Presentation.ApiKeys;
+using MoneyBee.Auth.Service.Presentation.Middleware;
 using MoneyBee.Auth.Service.Infrastructure.Data;
-using MoneyBee.Auth.Service.Infrastructure.Repositories;
-using MoneyBee.Auth.Service.Middleware;
-using MoneyBee.Auth.Service.Services;
-using MoneyBee.Common.Services;
+using MoneyBee.Auth.Service.Infrastructure.ApiKeys;
+using MoneyBee.Auth.Service.Infrastructure;
+using MoneyBee.Common.Abstractions;
+using MoneyBee.Common.Infrastructure.Caching;
 using Serilog;
 using StackExchange.Redis;
 
@@ -61,7 +61,9 @@ builder.Services.AddSwaggerGen(c =>
 
 // Database
 builder.Services.AddDbContext<AuthDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        b => b.MigrationsAssembly("MoneyBee.Auth.Service")));
 
 // Redis
 var redisConnectionString = builder.Configuration.GetValue<string>("Redis:ConnectionString") ?? "localhost:6379";
@@ -70,9 +72,21 @@ redisConfig.AbortOnConnectFail = false; // Allow app to start without Redis
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp => 
     ConnectionMultiplexer.Connect(redisConfig));
 
+// Options Pattern
+builder.Services.Configure<MoneyBee.Auth.Service.Infrastructure.RateLimitOptions>(
+    builder.Configuration.GetSection(MoneyBee.Auth.Service.Infrastructure.RateLimitOptions.SectionName));
+
 // Clean Architecture - Dependency Injection
 builder.Services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
-builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
+
+// Command Handlers
+builder.Services.AddScoped<MoneyBee.Auth.Service.Application.ApiKeys.Commands.CreateApiKey.CreateApiKeyHandler>();
+builder.Services.AddScoped<MoneyBee.Auth.Service.Application.ApiKeys.Commands.UpdateApiKey.UpdateApiKeyLastUsedHandler>();
+
+// Query Handlers
+builder.Services.AddScoped<MoneyBee.Auth.Service.Application.ApiKeys.Queries.ValidateApiKey.ValidateApiKeyHandler>();
+
+// Infrastructure Services
 builder.Services.AddScoped<IRateLimitService, RateLimitService>();
 
 // API Key Validator (direct DB access for Auth Service)

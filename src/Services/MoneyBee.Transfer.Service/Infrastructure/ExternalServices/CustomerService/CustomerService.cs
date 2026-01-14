@@ -1,6 +1,8 @@
 using MoneyBee.Common.Results;
 using MoneyBee.Common.Serialization;
-using MoneyBee.Transfer.Service.Constants;
+using MoneyBee.Transfer.Service.Application.Transfers.Services;
+using MoneyBee.Transfer.Service.Application.Transfers.Shared;
+using MoneyBee.Transfer.Service.Infrastructure.Constants;
 
 namespace MoneyBee.Transfer.Service.Infrastructure.ExternalServices.CustomerService;
 
@@ -19,7 +21,7 @@ public class CustomerService(
             if (!response.IsSuccessStatusCode)
             {
                 logger.LogWarning("Customer Service returned error: {StatusCode}", response.StatusCode);
-                return Result<CustomerInfo>.NotFound(ErrorMessages.Customer.NotFound);
+                return Result<CustomerInfo>.NotFound(TransferErrors.CustomerNotFound);
             }
 
             var result = await response.Content.ReadFromJsonAsync<CustomerResponse>(JsonSerializerOptionsProvider.Default, cancellationToken);
@@ -27,7 +29,7 @@ public class CustomerService(
             if (result?.Data == null)
             {
                 logger.LogInformation("Customer not found: {NationalId}", nationalId);
-                return Result<CustomerInfo>.NotFound(ErrorMessages.Customer.NotFound);
+                return Result<CustomerInfo>.NotFound(TransferErrors.CustomerNotFound);
             }
 
             return Result<CustomerInfo>.Success(result.Data);
@@ -35,7 +37,7 @@ public class CustomerService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error calling Customer Service");
-            return Result<CustomerInfo>.Failure(ErrorMessages.Customer.ServiceUnavailable);
+            return Result<CustomerInfo>.Failure(TransferErrors.CustomerServiceUnavailable);
         }
     }
 }

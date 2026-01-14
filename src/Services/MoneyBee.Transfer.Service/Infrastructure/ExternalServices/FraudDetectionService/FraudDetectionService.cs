@@ -1,5 +1,7 @@
 using MoneyBee.Common.Results;
-using MoneyBee.Transfer.Service.Constants;
+using MoneyBee.Transfer.Service.Application.Transfers.Services;
+using MoneyBee.Transfer.Service.Application.Transfers.Shared;
+using MoneyBee.Transfer.Service.Infrastructure.Constants;
 
 namespace MoneyBee.Transfer.Service.Infrastructure.ExternalServices.FraudDetectionService;
 
@@ -12,7 +14,8 @@ public class FraudDetectionService(
         Guid senderId,
         Guid receiverId,
         decimal amountInTRY,
-        string senderNationalId)
+        string senderNationalId,
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -26,12 +29,12 @@ public class FraudDetectionService(
 
             logger.LogInformation("Calling Fraud Detection Service for transfer check");
 
-            var response = await httpClient.PostAsJsonAsync(ExternalApiEndpoints.FraudDetection.CheckTransfer, request, CancellationToken.None);
+            var response = await httpClient.PostAsJsonAsync(ExternalApiEndpoints.FraudDetection.CheckTransfer, request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
                 logger.LogWarning("Fraud Service returned error: {StatusCode}", response.StatusCode);
-                return Result<FraudCheckResult>.Failure(ErrorMessages.FraudDetection.Failed);
+                return Result<FraudCheckResult>.Failure(TransferErrors.FraudDetectionFailed);
             }
 
             var result = await response.Content.ReadFromJsonAsync<FraudCheckResult>();
@@ -39,7 +42,7 @@ public class FraudDetectionService(
             if (result is null)
             {
                 logger.LogWarning("Fraud Service returned invalid response");
-                return Result<FraudCheckResult>.Failure(ErrorMessages.FraudDetection.Invalid);
+                return Result<FraudCheckResult>.Failure(TransferErrors.FraudDetectionInvalid);
             }
 
             logger.LogInformation("Fraud check result: {RiskLevel}", result.RiskLevel);
@@ -48,7 +51,7 @@ public class FraudDetectionService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error calling Fraud Detection Service");
-            return Result<FraudCheckResult>.Failure(ErrorMessages.FraudDetection.Error);
+            return Result<FraudCheckResult>.Failure(TransferErrors.FraudDetectionError);
         }
     }
 }
