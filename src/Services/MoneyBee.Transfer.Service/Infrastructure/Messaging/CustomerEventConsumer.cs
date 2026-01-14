@@ -1,8 +1,11 @@
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using MoneyBee.Common.Enums;
 using MoneyBee.Common.Events;
+using MoneyBee.Common.Serialization;
+using MoneyBee.Transfer.Service.Domain.Transfers;
 using MoneyBee.Transfer.Service.Infrastructure.Data;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -14,6 +17,7 @@ public class CustomerEventConsumer : BackgroundService
     private readonly ILogger<CustomerEventConsumer> _logger;
     private readonly IServiceProvider _serviceProvider;
     private readonly IConnection? _connection;
+    private readonly ConcurrentDictionary<Guid, bool> _processedEvents = new();
     private IModel? _channel;
 
     public CustomerEventConsumer(
@@ -102,24 +106,24 @@ public class CustomerEventConsumer : BackgroundService
                 switch (ea.RoutingKey)
                 {
                     case "customer.status.changed":
-                        var statusChangedEvent = JsonSerializer.Deserialize<CustomerStatusChangedEvent>(message);
-                        if (statusChangedEvent != null)
+                        var statusChangedEvent = JsonSerializer.Deserialize<CustomerStatusChangedEvent>(message, JsonSerializerOptionsProvider.Default);
+                        if (statusChangedEvent != null && _processedEvents.TryAdd(statusChangedEvent.EventId, true))
                         {
                             await ProcessCustomerStatusChangedAsync(statusChangedEvent);
                         }
                         break;
 
                     case "customer.created":
-                        var createdEvent = JsonSerializer.Deserialize<CustomerCreatedEvent>(message);
-                        if (createdEvent != null)
+                        var createdEvent = JsonSerializer.Deserialize<CustomerCreatedEvent>(message, JsonSerializerOptionsProvider.Default);
+                        if (createdEvent != null && _processedEvents.TryAdd(createdEvent.EventId, true))
                         {
                             await ProcessCustomerCreatedAsync(createdEvent);
                         }
                         break;
 
                     case "customer.deleted":
-                        var deletedEvent = JsonSerializer.Deserialize<CustomerDeletedEvent>(message);
-                        if (deletedEvent != null)
+                        var deletedEvent = JsonSerializer.Deserialize<CustomerDeletedEvent>(message, JsonSerializerOptionsProvider.Default);
+                        if (deletedEvent != null && _processedEvents.TryAdd(deletedEvent.EventId, true))
                         {
                             await ProcessCustomerDeletedAsync(deletedEvent);
                         }
@@ -177,45 +181,13 @@ public class CustomerEventConsumer : BackgroundService
             "Processing customer deleted: Customer {CustomerId}",
             customerEvent.CustomerId);
 
-        using var scope = _serviceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<TransferDbContext>();
+        await CancelCustomerPendingTransfersAsync(
+            customerEvent.CustomerId,
+            $"Customer {customerEvent.CustomerId} was deleted");
 
-        // Cancel all pending transfers for deleted customer
-        var pendingTransfers = await dbContext.Transfers
-            .Where(t => (t.SenderId == customerEvent.CustomerId || t.ReceiverId == customerEvent.CustomerId)
-                     && t.Status == TransferStatus.Pending)
-            .ToListAsync();
-
-        if (pendingTransfers.Any())
-        {
-            _logger.LogInformation(
-                "Found {Count} pending transfers to cancel for deleted customer {CustomerId}",
-                pendingTransfers.Count,
-                customerEvent.CustomerId);
-
-            foreach (var transfer in pendingTransfers)
-            {
-                transfer.Cancel($"Customer {customerEvent.CustomerId} was deleted");
-
-                _logger.LogInformation(
-                    "Cancelled transfer {TransactionCode} due to customer {CustomerId} being deleted",
-                    transfer.TransactionCode,
-                    customerEvent.CustomerId);
-            }
-
-            await dbContext.SaveChangesAsync();
-
-            _logger.LogInformation(
-                "Successfully cancelled {Count} pending transfers for deleted customer {CustomerId}",
-                pendingTransfers.Count,
-                customerEvent.CustomerId);
-        }
-        else
-        {
-            _logger.LogInformation(
-                "No pending transfers found for deleted customer {CustomerId}",
-                customerEvent.CustomerId);
-        }
+        _logger.LogInformation(
+            "Customer deleted event processed for {CustomerId}",
+            customerEvent.CustomerId);
     }
 
     private async Task ProcessCustomerStatusChangedAsync(CustomerStatusChangedEvent customerEvent)
@@ -229,45 +201,52 @@ public class CustomerEventConsumer : BackgroundService
         // If customer is blocked, cancel all pending transfers
         if (customerEvent.NewStatus == CustomerStatus.Blocked.ToString())
         {
-            using var scope = _serviceProvider.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<TransferDbContext>();
+            await CancelCustomerPendingTransfersAsync(
+                customerEvent.CustomerId,
+                $"Customer {customerEvent.CustomerId} was blocked");
+        }
 
-            // Find all pending transfers for this customer (as sender or receiver)
-            var pendingTransfers = await dbContext.Transfers
-                .Where(t => (t.SenderId == customerEvent.CustomerId || t.ReceiverId == customerEvent.CustomerId)
-                         && t.Status == TransferStatus.Pending)
-                .ToListAsync();
+        _logger.LogInformation(
+            "Customer status changed event processed for {CustomerId}",
+            customerEvent.CustomerId);
+    }
 
-            if (pendingTransfers.Any())
+    private async Task CancelCustomerPendingTransfersAsync(Guid customerId, string reason)
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var repository = scope.ServiceProvider.GetRequiredService<ITransferRepository>();
+
+        var pendingTransfers = await repository.GetPendingByCustomerIdAsync(customerId);
+        var transfersList = pendingTransfers.ToList();
+
+        if (transfersList.Any())
+        {
+            _logger.LogInformation(
+                "Found {Count} pending transfers to cancel for customer {CustomerId}",
+                transfersList.Count,
+                customerId);
+
+            foreach (var transfer in transfersList)
             {
-                _logger.LogInformation(
-                    "Found {Count} pending transfers to cancel for customer {CustomerId}",
-                    pendingTransfers.Count,
-                    customerEvent.CustomerId);
-
-                foreach (var transfer in pendingTransfers)
-                {
-                    transfer.Cancel($"Customer {customerEvent.CustomerId} was blocked");
-
-                    _logger.LogInformation(
-                        "Cancelled transfer {TransactionCode} due to customer {CustomerId} being blocked",
-                        transfer.TransactionCode,
-                        customerEvent.CustomerId);
-                }
-
-                await dbContext.SaveChangesAsync();
+                transfer.Cancel(reason);
+                await repository.UpdateAsync(transfer);
 
                 _logger.LogInformation(
-                    "Successfully cancelled {Count} pending transfers for blocked customer {CustomerId}",
-                    pendingTransfers.Count,
-                    customerEvent.CustomerId);
+                    "Cancelled transfer {TransactionCode}: {Reason}",
+                    transfer.TransactionCode,
+                    reason);
             }
-            else
-            {
-                _logger.LogInformation(
-                    "No pending transfers found for blocked customer {CustomerId}",
-                    customerEvent.CustomerId);
-            }
+
+            _logger.LogInformation(
+                "Successfully cancelled {Count} pending transfers for customer {CustomerId}",
+                transfersList.Count,
+                customerId);
+        }
+        else
+        {
+            _logger.LogInformation(
+                "No pending transfers found for customer {CustomerId}",
+                customerId);
         }
     }
 
