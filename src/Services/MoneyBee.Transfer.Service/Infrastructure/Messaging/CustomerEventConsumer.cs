@@ -218,14 +218,24 @@ public class CustomerEventConsumer : BackgroundService
             customerEvent.PreviousStatus,
             customerEvent.NewStatus);
     
-            // If customer is blocked, cancel all pending transfers
-            if (customerEvent.NewStatus == CustomerStatus.Blocked.ToString())
-            {
-                _logger.LogWarning("Customer {CustomerId} was blocked, cancelling pending transfers", customerEvent.CustomerId);
-                await CancelCustomerPendingTransfersAsync(
-                    customerEvent.CustomerId,
-                    $"Customer {customerEvent.CustomerId} was blocked");
-            }
+        // Parse NewStatus - it arrives as numeric string (e.g., "1", "2", "3")
+        if (!int.TryParse(customerEvent.NewStatus, out var statusValue))
+        {
+            _logger.LogWarning("Invalid NewStatus value for customer {CustomerId}: {NewStatus}", 
+                customerEvent.CustomerId, customerEvent.NewStatus);
+            return;
+        }
+
+        var newStatus = (CustomerStatus)statusValue;
+        
+        // If customer is blocked, cancel all pending transfers
+        if (newStatus == CustomerStatus.Blocked)
+        {
+            _logger.LogWarning("Customer {CustomerId} was blocked, cancelling pending transfers", customerEvent.CustomerId);
+            await CancelCustomerPendingTransfersAsync(
+                customerEvent.CustomerId,
+                $"Customer {customerEvent.CustomerId} was blocked");
+        }
 
         _logger.LogInformation(
             "Customer status changed event processed for {CustomerId}",
