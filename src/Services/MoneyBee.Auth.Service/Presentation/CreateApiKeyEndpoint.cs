@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using MoneyBee.Auth.Service.Application.DTOs;
 using MoneyBee.Auth.Service.Application.Interfaces;
-using MoneyBee.Auth.Service.Extensions;
+using MoneyBee.Web.Common.Extensions;
 using MoneyBee.Common.Models;
 
 namespace MoneyBee.Auth.Service.Presentation;

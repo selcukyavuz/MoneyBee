@@ -34,6 +34,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Shared\MoneyBee.Common\MoneyBee.Common.csproj" />
+    <ProjectReference Include="..\..\Shared\MoneyBee.Web.Common\MoneyBee.Web.Common.csproj" />
   </ItemGroup>
 
 </Project>

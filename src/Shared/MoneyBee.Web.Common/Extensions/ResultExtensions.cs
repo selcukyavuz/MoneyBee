@@ -1,16 +1,14 @@
+using Microsoft.AspNetCore.Http;
 using MoneyBee.Common.Models;
 using MoneyBee.Common.Results;
 
-namespace MoneyBee.Customer.Service.Extensions;
+namespace MoneyBee.Web.Common.Extensions;
 
 /// <summary>
-/// Extension methods for converting Result to IResult with appropriate HTTP status codes
+/// Shared extension methods for converting Result to IResult with appropriate HTTP status codes
 /// </summary>
 public static class ResultExtensions
 {
-    /// <summary>
-    /// Converts a Result to IResult with appropriate HTTP status code based on ErrorType
-    /// </summary>
     public static IResult ToHttpResult(this Result result)
     {
         if (result.IsSuccess)
@@ -29,9 +27,6 @@ public static class ResultExtensions
         };
     }
 
-    /// <summary>
-    /// Converts a Result{T} to IResult with appropriate HTTP status code based on ErrorType
-    /// </summary>
     public static IResult ToHttpResult<T>(this Result<T> result)
     {
         if (result.IsSuccess)

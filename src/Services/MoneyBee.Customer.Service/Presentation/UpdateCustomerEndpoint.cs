@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using MoneyBee.Common.Models;
 using MoneyBee.Customer.Service.Application.Customers;
 using MoneyBee.Customer.Service.Application.Customers;
-using MoneyBee.Customer.Service.Extensions;
+using MoneyBee.Web.Common.Extensions;
 
 namespace MoneyBee.Customer.Service.Presentation;
 

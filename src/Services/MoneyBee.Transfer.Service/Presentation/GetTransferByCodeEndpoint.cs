@@ -1,7 +1,7 @@
 using MoneyBee.Common.Models;
 using MoneyBee.Transfer.Service.Application.Transfers;
 using MoneyBee.Transfer.Service.Application.Transfers;
-using MoneyBee.Transfer.Service.Extensions;
+using MoneyBee.Web.Common.Extensions;
 
 namespace MoneyBee.Transfer.Service.Presentation;
 
