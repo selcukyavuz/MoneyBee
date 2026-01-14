@@ -198,15 +198,12 @@ public class Transfer
     }
 
     /// <summary>
-    /// Validates if this transfer can be completed by the given receiver
+    /// Validates if this transfer can be completed
     /// </summary>
-    public Result ValidateForCompletion(string receiverNationalId)
+    public Result ValidateForCompletion()
     {
         if (Status != TransferStatus.Pending)
             return Result.Failure($"Transfer cannot be completed. Status: {Status}");
-
-        if (ReceiverNationalId != receiverNationalId)
-            return Result.Failure("Receiver identity verification failed");
 
         if (RequiresApproval())
         {

@@ -1,21 +1,25 @@
 using Microsoft.EntityFrameworkCore;
-using MoneyBee.Customer.Service.Application.Customers;
-using MoneyBee.Customer.Service.Domain.Customers;
 using MoneyBee.Customer.Service.Domain.Services;
 using MoneyBee.Customer.Service.Presentation.Customers;
 using MoneyBee.Customer.Service.Infrastructure.Data;
 using MoneyBee.Customer.Service.Infrastructure.ExternalServices;
-using MoneyBee.Customer.Service.Infrastructure.Customers;
 using MoneyBee.Customer.Service.Infrastructure.HostedServices;
-using MoneyBee.Common.Options;
 using MoneyBee.Common.Abstractions;
-using MoneyBee.Common.Infrastructure.Messaging;
 using MoneyBee.Web.Common.Extensions;
 using Polly;
 using Polly.Extensions.Http;
 using RabbitMQ.Client;
 using Serilog;
 using System.Text.Json.Serialization;
+using MoneyBee.Customer.Service.Application.Customers.Commands.CreateCustomer;
+using MoneyBee.Customer.Service.Application.Customers.Commands.UpdateCustomer;
+using MoneyBee.Customer.Service.Application.Customers.Commands.UpdateCustomerStatus;
+using MoneyBee.Customer.Service.Application.Customers.Commands.DeleteCustomer;
+using MoneyBee.Customer.Service.Application.Customers.Queries.VerifyCustomer;
+using MoneyBee.Customer.Service.Application.Customers.Queries.GetCustomerById;
+using MoneyBee.Customer.Service.Application.Customers.Queries.GetAllCustomers;
+using MoneyBee.Customer.Service.Application.Customers.Queries.GetCustomerByNationalId;
+using MoneyBee.Common.Infrastructure.Messaging;
 
 // PostgreSQL timestamp compatibility
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
@@ -52,31 +56,52 @@ builder.Services.AddAuthServiceClient(builder.Configuration);
 // Redis Cache for API Key validation
 builder.Services.AddRedisCacheWithInstance(builder.Configuration, "CustomerService");
 
-// HTTP Clients
-builder.Services.AddHttpClientWithCircuitBreaker<IKycService, KycService>(
-    (sp, client) =>
+// Repositories
+builder.Services.AddScoped<MoneyBee.Customer.Service.Domain.Customers.ICustomerRepository, 
+    MoneyBee.Customer.Service.Infrastructure.Customers.CustomerRepository>();
+
+// Handlers
+builder.Services.AddScoped<CreateCustomerHandler>();
+builder.Services.AddScoped<UpdateCustomerHandler>();
+builder.Services.AddScoped<UpdateCustomerStatusHandler>();
+builder.Services.AddScoped<DeleteCustomerHandler>();
+builder.Services.AddScoped<VerifyCustomerHandler>();
+builder.Services.AddScoped<GetCustomerByIdHandler>();
+builder.Services.AddScoped<GetAllCustomersHandler>();
+builder.Services.AddScoped<GetCustomerByNationalIdHandler>();
+
+// External Services - KycService with Named HttpClient
+var kycHttpClientBuilder = builder.Services.AddHttpClient(nameof(KycService))
+    .ConfigureHttpClient((sp, client) =>
     {
-        var kycServiceUrl = builder.Configuration[MoneyBee.Common.Constants.ConfigurationKeys.ExternalServices.KycService] 
+        var configuration = sp.GetRequiredService<IConfiguration>();
+        var kycServiceUrl = configuration[MoneyBee.Common.Constants.ConfigurationKeys.ExternalServices.KycService] 
             ?? "http://kyc-service";
         client.BaseAddress = new Uri(kycServiceUrl);
-    },
-    handledEventsAllowedBeforeBreaking: 3,
-    durationOfBreakSeconds: 30);
+    })
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+    {
+        PooledConnectionLifetime = TimeSpan.FromMinutes(2)
+    })
+    .AddPolicyHandler(HttpPolicyExtensions
+        .HandleTransientHttpError()
+        .CircuitBreakerAsync(3, TimeSpan.FromSeconds(30)));
+
+builder.Services.AddScoped<IKycService>(sp =>
+{
+    var factory = sp.GetRequiredService<IHttpClientFactory>();
+    var httpClient = factory.CreateClient(nameof(KycService));
+    var logger = sp.GetRequiredService<ILogger<KycService>>();
+    return new KycService(httpClient, logger);
+});
 
 // RabbitMQ
 builder.Services.AddRabbitMq(builder.Configuration);
 
-// Clean Architecture - Dependency Injection
-var customerAssembly = typeof(Program).Assembly;
-
-// Automatic registration using Scrutor
-builder.Services.AddApplicationHandlers(customerAssembly);
-builder.Services.AddRepositories(customerAssembly);
-builder.Services.AddInfrastructureServices(customerAssembly);
 builder.Services.AddSingleton<IEventPublisher>(sp =>
 {
     var connection = sp.GetService<IConnection>();
-    var logger = sp.GetRequiredService<ILogger<MoneyBee.Common.Infrastructure.Messaging.RabbitMqEventPublisher>>();
+    var logger = sp.GetRequiredService<ILogger<RabbitMqEventPublisher>>();
     
     Func<string, string> routingKeyResolver = eventTypeName => eventTypeName switch
     {
@@ -86,7 +111,7 @@ builder.Services.AddSingleton<IEventPublisher>(sp =>
         _ => $"customer.{eventTypeName.ToLower()}"
     };
     
-    return new MoneyBee.Common.Infrastructure.Messaging.RabbitMqEventPublisher(connection, logger, routingKeyResolver, "Customer Service");
+    return new RabbitMqEventPublisher(connection, logger, routingKeyResolver, "Customer Service");
 });
 
 // Background Services

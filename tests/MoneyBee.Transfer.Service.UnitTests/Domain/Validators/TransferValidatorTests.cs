@@ -83,7 +83,7 @@ public class TransferValidatorTests
         );
 
         // Act
-        var result = transfer.ValidateForCompletion("98765432109");
+        var result = transfer.ValidateForCompletion();
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -112,39 +112,11 @@ public class TransferValidatorTests
         transfer.Complete();
 
         // Act
-        var result = transfer.ValidateForCompletion("98765432109");
+        var result = transfer.ValidateForCompletion();
 
         // Assert
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("Transfer cannot be completed");
-    }
-
-    [Fact]
-    public void ValidateForCompletion_WithWrongReceiver_ShouldFail()
-    {
-        // Arrange
-        var transfer = TransferEntity.Create(
-            senderId: Guid.NewGuid(),
-            receiverId: Guid.NewGuid(),
-            amount: 500m,
-            currency: Currency.TRY,
-            amountInTRY: 500m,
-            exchangeRate: null,
-            transactionFee: 0m,
-            transactionCode: "TXN123456",
-            riskLevel: RiskLevel.Low,
-            idempotencyKey: null,
-            approvalRequiredUntil: null,
-            senderNationalId: "12345678901",
-            receiverNationalId: "98765432109"
-        );
-
-        // Act
-        var result = transfer.ValidateForCompletion("11111111111");
-
-        // Assert
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Receiver identity verification failed");
     }
 
     [Fact]

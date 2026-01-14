@@ -60,58 +60,6 @@ public static class ProgramExtensions
     }
 
     /// <summary>
-    /// Automatically register handlers using Scrutor
-    /// </summary>
-    public static IServiceCollection AddApplicationHandlers(
-        this IServiceCollection services,
-        System.Reflection.Assembly assembly)
-    {
-        services.Scan(scan => scan
-            .FromAssemblies(assembly)
-            .AddClasses(classes => classes.Where(t => t.Name.EndsWith("Handler")))
-            .AsSelf()
-            .WithScopedLifetime());
-
-        return services;
-    }
-
-    /// <summary>
-    /// Automatically register repositories using Scrutor
-    /// </summary>
-    public static IServiceCollection AddRepositories(
-        this IServiceCollection services,
-        System.Reflection.Assembly assembly)
-    {
-        services.Scan(scan => scan
-            .FromAssemblies(assembly)
-            .AddClasses(classes => classes.AssignableTo(typeof(object))
-                .Where(t => t.Name.EndsWith("Repository")))
-            .AsMatchingInterface()
-            .WithScopedLifetime());
-
-        return services;
-    }
-
-    /// <summary>
-    /// Automatically register infrastructure services using Scrutor
-    /// </summary>
-    public static IServiceCollection AddInfrastructureServices(
-        this IServiceCollection services,
-        System.Reflection.Assembly assembly)
-    {
-        services.Scan(scan => scan
-            .FromAssemblies(assembly)
-            .AddClasses(classes => classes.AssignableTo(typeof(object))
-                .Where(t => t.Name.EndsWith("Service") 
-                         && !t.Name.Contains("Background")
-                         && !t.Name.Contains("Hosted")))
-            .AsMatchingInterface()
-            .WithScopedLifetime());
-
-        return services;
-    }
-
-    /// <summary>
     /// Configure RabbitMQ connection with automatic recovery
     /// </summary>
     public static IServiceCollection AddRabbitMq(
@@ -197,14 +145,11 @@ public static class ProgramExtensions
     {
         var builder = services.AddHttpClient<TClient, TImplementation>();
         
-        // Configure the HttpClient for each request
+        // Configure the HttpClient  
         builder.ConfigureHttpClient(configureClient);
         
         return builder
-            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
-            {
-                PooledConnectionLifetime = TimeSpan.FromMinutes(2)
-            })
+            // Removed ConfigurePrimaryHttpMessageHandler to test if it's interfering
             .AddPolicyHandler(HttpPolicyExtensions
                 .HandleTransientHttpError()
                 .WaitAndRetryAsync(retryCount, retryAttempt => 
@@ -224,7 +169,8 @@ public static class ProgramExtensions
     {
         var builder = services.AddHttpClient<TClient, TImplementation>();
         
-        // Configure the HttpClient for each request
+        // CRITICAL: Use ConfigureHttpClient instead of passing to AddHttpClient
+        // This ensures the configuration is applied every time an HttpClient is created
         builder.ConfigureHttpClient(configureClient);
         
         return builder

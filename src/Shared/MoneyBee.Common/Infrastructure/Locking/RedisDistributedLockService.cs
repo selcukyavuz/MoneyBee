@@ -18,6 +18,11 @@ public class RedisDistributedLockService(
         TimeSpan expiry,
         Func<Task<T>> action)
     {
+        if (expiry <= TimeSpan.Zero)
+        {
+            throw new ArgumentException("Lock expiry must be positive", nameof(expiry));
+        }
+
         var db = redis.GetDatabase();
         var lockValue = Guid.NewGuid().ToString(); // Unique lock value to prevent accidental unlock
         var lockAcquired = false;

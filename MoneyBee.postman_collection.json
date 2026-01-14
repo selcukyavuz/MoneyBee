@@ -751,10 +751,6 @@
                 "value": "{{apiKey}}"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"nationalId\": \"{{sender_nationalId}}\"\n}"
-            },
             "url": {
               "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}/complete",
               "host": [
@@ -994,10 +990,6 @@
                     "value": "{{apiKey}}"
                   }
                 ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"nationalId\": \"{{sender_nationalId}}\"\n}"
-                },
                 "url": {
                   "raw": "{{baseUrl_transfer}}/api/transfers/{{transactionCode}}/complete",
                   "host": [

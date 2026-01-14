@@ -48,6 +48,16 @@ public class FraudDetectionService(
             logger.LogInformation("Fraud check result: {RiskLevel}", result.RiskLevel);
             return Result<FraudCheckResult>.Success(result);
         }
+        catch (HttpRequestException ex)
+        {
+            // Graceful degradation: if fraud service is unavailable, default to Medium risk
+            logger.LogWarning(ex, "Fraud Detection Service unavailable, defaulting to Medium risk");
+            return Result<FraudCheckResult>.Success(new FraudCheckResult
+            {
+                RiskLevel = MoneyBee.Common.Enums.RiskLevel.Medium,
+                Message = "Fraud service unavailable - defaulted to Medium risk"
+            });
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error calling Fraud Detection Service");

@@ -14,11 +14,6 @@ public class CustomerService(
     {
         try
         {
-            if (httpClient.BaseAddress == null)
-            {
-                logger.LogError("HttpClient BaseAddress is not configured for CustomerService");
-                return Result<CustomerInfo>.Failure(TransferErrors.CustomerServiceUnavailable);
-            }
 
             logger.LogInformation("Fetching customer by National ID: {NationalId}", nationalId);
 

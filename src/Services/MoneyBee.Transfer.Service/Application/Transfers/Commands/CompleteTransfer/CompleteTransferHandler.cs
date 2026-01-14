@@ -12,19 +12,19 @@ namespace MoneyBee.Transfer.Service.Application.Transfers.Commands.CompleteTrans
 public class CompleteTransferHandler(
     ITransferRepository repository,
     IEventPublisher eventPublisher,
-    ILogger<CompleteTransferHandler> logger) : ICommandHandler<(string TransactionCode, CompleteTransferRequest Request), Result<TransferDto>>
+    ILogger<CompleteTransferHandler> logger) : ICommandHandler<string, Result<TransferDto>>
 {
-    public async Task<Result<TransferDto>> HandleAsync((string TransactionCode, CompleteTransferRequest Request) request, CancellationToken cancellationToken = default)
+    public async Task<Result<TransferDto>> HandleAsync(string transactionCode, CancellationToken cancellationToken = default)
     {
-        var transfer = await repository.GetByTransactionCodeAsync(request.TransactionCode);
+        var transfer = await repository.GetByTransactionCodeAsync(transactionCode);
 
         if (transfer is null)
         {
             return Result<TransferDto>.NotFound(TransferErrors.TransferNotFound);
         }
 
-        // Use domain entity for validation
-        var validationResult = transfer.ValidateForCompletion(request.Request.ReceiverNationalId);
+        // Validate transfer can be completed
+        var validationResult = transfer.ValidateForCompletion();
         if (!validationResult.IsSuccess)
         {
             return Result<TransferDto>.Failure(validationResult.Error!);

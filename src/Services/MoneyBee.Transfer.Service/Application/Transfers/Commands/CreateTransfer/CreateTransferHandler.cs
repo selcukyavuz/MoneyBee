@@ -140,6 +140,11 @@ public class CreateTransferHandler(
         }
 
         var fraudCheck = fraudCheckResult.Value!;
+        
+        if (fraudCheck.Message?.Contains("unavailable") == true)
+        {
+            logger.LogWarning("Transfer proceeding with fallback fraud check: {Message}", fraudCheck.Message);
+        }
 
         // 8. Reject if HIGH risk - use static helper since we don't have entity yet
         if (fraudCheck.RiskLevel == RiskLevel.High)

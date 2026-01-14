@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using MoneyBee.Auth.Service.Domain.ApiKeys;
 using MoneyBee.Auth.Service.Presentation.ApiKeys;
 using MoneyBee.Auth.Service.Presentation.Middleware;
 using MoneyBee.Auth.Service.Infrastructure.Data;
@@ -8,7 +7,10 @@ using MoneyBee.Auth.Service.Infrastructure;
 using MoneyBee.Common.Abstractions;
 using MoneyBee.Web.Common.Extensions;
 using Serilog;
-using StackExchange.Redis;
+using MoneyBee.Auth.Service.Domain.ApiKeys;
+using MoneyBee.Auth.Service.Application.ApiKeys.Commands.CreateApiKey;
+using MoneyBee.Auth.Service.Application.ApiKeys.Commands.UpdateApiKey;
+using MoneyBee.Auth.Service.Application.ApiKeys.Queries.ValidateApiKey;
 
 // PostgreSQL timestamp compatibility
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
@@ -42,16 +44,18 @@ builder.Services.AddDbContext<AuthDbContext>(options =>
 builder.Services.AddRedisConnectionMultiplexer(builder.Configuration);
 
 // Options Pattern
-builder.Services.Configure<MoneyBee.Auth.Service.Infrastructure.RateLimitOptions>(
-    builder.Configuration.GetSection(MoneyBee.Auth.Service.Infrastructure.RateLimitOptions.SectionName));
+builder.Services.Configure<RateLimitOptions>(
+    builder.Configuration.GetSection(RateLimitOptions.SectionName));
 
-// Clean Architecture - Dependency Injection
-var authAssembly = typeof(Program).Assembly;
+builder.Services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
 
-// Automatic registration using Scrutor
-builder.Services.AddApplicationHandlers(authAssembly);
-builder.Services.AddRepositories(authAssembly);
-builder.Services.AddInfrastructureServices(authAssembly);
+// Handlers
+builder.Services.AddScoped<CreateApiKeyHandler>();
+builder.Services.AddScoped<UpdateApiKeyLastUsedHandler>();
+builder.Services.AddScoped<ValidateApiKeyHandler>();
+
+// Services
+builder.Services.AddScoped<IRateLimitService, RateLimitService>();
 
 // API Key Validator (direct DB access for Auth Service)
 builder.Services.AddScoped<IApiKeyValidator, DirectApiKeyValidator>();

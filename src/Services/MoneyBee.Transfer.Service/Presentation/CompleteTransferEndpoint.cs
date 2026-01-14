@@ -25,13 +25,12 @@ public static class CompleteTransferEndpoint
 
     private static async Task<IResult> HandleAsync(
         string code,
-        [FromBody] CompleteTransferRequest request,
         CompleteTransferHandler handler,
         ILogger<Program> logger)
     {
         try
         {
-            var result = await handler.HandleAsync((code, request));
+            var result = await handler.HandleAsync(code);
 
             if (!result.IsSuccess)
                 return result.ToHttpResult();
