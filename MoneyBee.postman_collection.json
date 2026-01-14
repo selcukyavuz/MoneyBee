@@ -808,14 +808,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl_transfer}}/api/transfers/limit/{{sender_id}}",
+              "raw": "{{baseUrl_transfer}}/api/transfers/daily-limit/{{sender_id}}",
               "host": [
                 "{{baseUrl_transfer}}"
               ],
               "path": [
                 "api",
                 "transfers",
-                "limit",
+                "daily-limit",
                 "{{sender_id}}"
               ]
             }
@@ -1279,16 +1279,15 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{baseUrl_transfer}}/api/transfers/customer/{{sender_nationalId}}/daily",
+                  "raw": "{{baseUrl_transfer}}/api/transfers/daily-limit/{{sender_id}}",
                   "host": [
                     "{{baseUrl_transfer}}"
                   ],
                   "path": [
                     "api",
                     "transfers",
-                    "customer",
-                    "{{sender_nationalId}}",
-                    "daily"
+                    "daily-limit",
+                    "{{sender_id}}"
                   ]
                 },
                 "description": "Should show 10,000 TRY available"
@@ -1639,7 +1638,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"newStatus\": \"Blocked\",\n  \"reason\": \"Testing auto-cancel of pending transfers\"\n}"
+                  "raw": "{\n  \"status\": \"Blocked\",\n  \"reason\": \"Testing auto-cancel of pending transfers\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl_customer}}/api/customers/{{sender_id}}/status",

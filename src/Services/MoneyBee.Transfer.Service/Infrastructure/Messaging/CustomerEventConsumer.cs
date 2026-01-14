@@ -73,6 +73,9 @@ public class CustomerEventConsumer : BackgroundService
                 exchange: "moneybee.events",
                 routingKey: "customer.deleted");
 
+            // Set prefetch count to process messages one at a time
+            _channel.BasicQos(prefetchSize: 0, prefetchCount: 1, global: false);
+
             _logger.LogInformation("RabbitMQ connection established, queue bound to exchange with multiple routing keys");
         }
         catch (Exception ex)
@@ -85,18 +88,25 @@ public class CustomerEventConsumer : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        _logger.LogInformation("=== ExecuteAsync started ===");
+        
         if (_channel == null)
         {
             _logger.LogWarning("RabbitMQ channel not available, consumer will not process messages");
             return;
         }
 
-        var consumer = new AsyncEventingBasicConsumer(_channel);
+        _logger.LogInformation("Creating EventingBasicConsumer (synchronous)...");
+        var consumer = new EventingBasicConsumer(_channel);
 
-        consumer.Received += async (model, ea) =>
+        _logger.LogInformation("Registering Received event handler...");
+        consumer.Received += (model, ea) =>
         {
             var body = ea.Body.ToArray();
             var message = Encoding.UTF8.GetString(body);
+
+            _logger.LogInformation("=== CONSUMER RECEIVED EVENT === Routing Key: {RoutingKey}, Message Length: {Length}", 
+                ea.RoutingKey, message.Length);
 
             try
             {
@@ -109,7 +119,7 @@ public class CustomerEventConsumer : BackgroundService
                         var statusChangedEvent = JsonSerializer.Deserialize<CustomerStatusChangedEvent>(message, JsonSerializerOptionsProvider.Default);
                         if (statusChangedEvent != null && _processedEvents.TryAdd(statusChangedEvent.EventId, true))
                         {
-                            await ProcessCustomerStatusChangedAsync(statusChangedEvent);
+                            ProcessCustomerStatusChangedAsync(statusChangedEvent).GetAwaiter().GetResult();
                         }
                         break;
 
@@ -117,7 +127,7 @@ public class CustomerEventConsumer : BackgroundService
                         var createdEvent = JsonSerializer.Deserialize<CustomerCreatedEvent>(message, JsonSerializerOptionsProvider.Default);
                         if (createdEvent != null && _processedEvents.TryAdd(createdEvent.EventId, true))
                         {
-                            await ProcessCustomerCreatedAsync(createdEvent);
+                            ProcessCustomerCreatedAsync(createdEvent).GetAwaiter().GetResult();
                         }
                         break;
 
@@ -125,7 +135,7 @@ public class CustomerEventConsumer : BackgroundService
                         var deletedEvent = JsonSerializer.Deserialize<CustomerDeletedEvent>(message, JsonSerializerOptionsProvider.Default);
                         if (deletedEvent != null && _processedEvents.TryAdd(deletedEvent.EventId, true))
                         {
-                            await ProcessCustomerDeletedAsync(deletedEvent);
+                            ProcessCustomerDeletedAsync(deletedEvent).GetAwaiter().GetResult();
                         }
                         break;
 
@@ -147,15 +157,25 @@ public class CustomerEventConsumer : BackgroundService
             }
         };
 
-        _channel.BasicConsume(
+        _logger.LogInformation("Calling BasicConsume...");
+        var consumerTag = _channel.BasicConsume(
             queue: "transfer.customer.events",
             autoAck: false,
             consumer: consumer);
 
-        _logger.LogInformation("Customer Event Consumer started listening");
+        _logger.LogInformation("Consumer registered with tag: {ConsumerTag}", consumerTag);
+        _logger.LogInformation("Customer Event Consumer started listening on queue 'transfer.customer.events'");
+        _logger.LogInformation("Waiting for customer events...");
 
         // Keep the task running
-        await Task.Delay(Timeout.Infinite, stoppingToken);
+        try
+        {
+            await Task.Delay(Timeout.Infinite, stoppingToken);
+        }
+        catch (TaskCanceledException)
+        {
+            _logger.LogInformation("Consumer task cancelled");
+        }
     }
 
     private async Task ProcessCustomerCreatedAsync(CustomerCreatedEvent customerEvent)
@@ -197,14 +217,15 @@ public class CustomerEventConsumer : BackgroundService
             customerEvent.CustomerId,
             customerEvent.PreviousStatus,
             customerEvent.NewStatus);
-
-        // If customer is blocked, cancel all pending transfers
-        if (customerEvent.NewStatus == CustomerStatus.Blocked.ToString())
-        {
-            await CancelCustomerPendingTransfersAsync(
-                customerEvent.CustomerId,
-                $"Customer {customerEvent.CustomerId} was blocked");
-        }
+    
+            // If customer is blocked, cancel all pending transfers
+            if (customerEvent.NewStatus == CustomerStatus.Blocked.ToString())
+            {
+                _logger.LogWarning("Customer {CustomerId} was blocked, cancelling pending transfers", customerEvent.CustomerId);
+                await CancelCustomerPendingTransfersAsync(
+                    customerEvent.CustomerId,
+                    $"Customer {customerEvent.CustomerId} was blocked");
+            }
 
         _logger.LogInformation(
             "Customer status changed event processed for {CustomerId}",

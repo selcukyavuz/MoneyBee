@@ -169,9 +169,23 @@ var exchangeRateHttpClientBuilder = builder.Services.AddHttpClient(nameof(Exchan
         PooledConnectionLifetime = TimeSpan.FromMinutes(2)
     })
     .AddHttpMessageHandler<ApiKeyDelegatingHandler>()
-    .AddPolicyHandler(HttpPolicyExtensions
-        .HandleTransientHttpError()
-        .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))));
+    .AddPolicyHandler((sp, request) =>
+    {
+        var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("ExchangeRateService.RetryPolicy");
+        return HttpPolicyExtensions
+            .HandleTransientHttpError()
+            .WaitAndRetryAsync(
+                3,
+                retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                onRetry: (outcome, timespan, retryCount, context) =>
+                {
+                    logger.LogWarning(
+                        "ExchangeRateService retry {RetryCount}/3 after {Delay}s. Reason: {Exception}",
+                        retryCount,
+                        timespan.TotalSeconds,
+                        outcome.Exception?.Message ?? outcome.Result?.StatusCode.ToString());
+                });
+    });
 
 builder.Services.AddScoped<IExchangeRateService>(sp =>
 {
