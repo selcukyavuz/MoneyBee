@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using MoneyBee.Auth.Service.Application.ApiKeys;
 using MoneyBee.Auth.Service.Domain.ApiKeys;
 using MoneyBee.Auth.Service.Presentation.ApiKeys;
 using MoneyBee.Auth.Service.Presentation.Middleware;
@@ -7,7 +6,6 @@ using MoneyBee.Auth.Service.Infrastructure.Data;
 using MoneyBee.Auth.Service.Infrastructure.ApiKeys;
 using MoneyBee.Auth.Service.Infrastructure;
 using MoneyBee.Common.Abstractions;
-using MoneyBee.Common.Infrastructure.Caching;
 using Serilog;
 using StackExchange.Redis;
 

@@ -183,7 +183,7 @@ builder.Services.AddSingleton<IConnection>(sp =>
 builder.Services.AddSingleton<IDistributedLockService, RedisDistributedLockService>();
 builder.Services.AddSingleton<MoneyBee.Common.Abstractions.IEventPublisher>(sp =>
 {
-    var connection = sp.GetRequiredService<IConnection?>();
+    var connection = sp.GetService<IConnection>();
     var logger = sp.GetRequiredService<ILogger<MoneyBee.Common.Infrastructure.Messaging.RabbitMqEventPublisher>>();
     
     Func<string, string> routingKeyResolver = eventTypeName => eventTypeName switch

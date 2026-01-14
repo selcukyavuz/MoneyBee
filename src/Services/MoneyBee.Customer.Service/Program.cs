@@ -138,7 +138,7 @@ builder.Services.AddScoped<MoneyBee.Customer.Service.Application.Customers.Queri
 builder.Services.AddScoped<IKycService, KycService>();
 builder.Services.AddSingleton<IEventPublisher>(sp =>
 {
-    var connection = sp.GetRequiredService<IConnection?>();
+    var connection = sp.GetService<IConnection>();
     var logger = sp.GetRequiredService<ILogger<MoneyBee.Common.Infrastructure.Messaging.RabbitMqEventPublisher>>();
     
     Func<string, string> routingKeyResolver = eventTypeName => eventTypeName switch

@@ -13,35 +13,32 @@ public static class ResultExtensions
     {
         if (result.IsSuccess)
         {
-            return Results.Ok(ApiResponse<object>.SuccessResponse(null));
+            return Results.Ok(ApiResponse<object?>.SuccessResponse(null));
         }
 
-        return result.ErrorType switch
-        {
-            ResultErrorType.NotFound => Results.NotFound(ApiResponse<object>.ErrorResponse(result.Error!)),
-            ResultErrorType.Validation => Results.BadRequest(ApiResponse<object>.ErrorResponse(result.Error!)),
-            ResultErrorType.Unauthorized => Results.Unauthorized(),
-            ResultErrorType.Forbidden => Results.StatusCode(403),
-            ResultErrorType.Conflict => Results.Conflict(ApiResponse<object>.ErrorResponse(result.Error!)),
-            _ => Results.BadRequest(ApiResponse<object>.ErrorResponse(result.Error!))
-        };
+        return CreateErrorResult<object>(result.ErrorType, result.Error!);
     }
 
     public static IResult ToHttpResult<T>(this Result<T> result)
     {
         if (result.IsSuccess)
         {
-            return Results.Ok(ApiResponse<T>.SuccessResponse(result.Value));
+            return Results.Ok(ApiResponse<T>.SuccessResponse(result.Value!));
         }
 
-        return result.ErrorType switch
+        return CreateErrorResult<T>(result.ErrorType, result.Error!);
+    }
+
+    private static IResult CreateErrorResult<T>(ResultErrorType errorType, string error)
+    {
+        return errorType switch
         {
-            ResultErrorType.NotFound => Results.NotFound(ApiResponse<T>.ErrorResponse(result.Error!)),
-            ResultErrorType.Validation => Results.BadRequest(ApiResponse<T>.ErrorResponse(result.Error!)),
+            ResultErrorType.NotFound => Results.NotFound(ApiResponse<T>.ErrorResponse(error)),
+            ResultErrorType.Validation => Results.BadRequest(ApiResponse<T>.ErrorResponse(error)),
             ResultErrorType.Unauthorized => Results.Unauthorized(),
             ResultErrorType.Forbidden => Results.StatusCode(403),
-            ResultErrorType.Conflict => Results.Conflict(ApiResponse<T>.ErrorResponse(result.Error!)),
-            _ => Results.BadRequest(ApiResponse<T>.ErrorResponse(result.Error!))
+            ResultErrorType.Conflict => Results.Conflict(ApiResponse<T>.ErrorResponse(error)),
+            _ => Results.BadRequest(ApiResponse<T>.ErrorResponse(error))
         };
     }
 }
