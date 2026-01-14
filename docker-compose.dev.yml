@@ -1,0 +1,174 @@
+# Docker Compose - Development Environment
+# Only infrastructure services - Run MoneyBee services locally with dotnet run
+# Usage: docker compose -f docker-compose.dev.yml up -d
+
+services:
+  # PostgreSQL Databases
+  postgres-auth:
+    image: postgres:16-alpine
+    container_name: moneybee-postgres-auth
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: moneybee
+      POSTGRES_PASSWORD: moneybee123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-auth-data:/var/lib/postgresql/data
+    networks:
+      - moneybee-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moneybee -d auth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  postgres-customer:
+    image: postgres:16-alpine
+    container_name: moneybee-postgres-customer
+    environment:
+      POSTGRES_DB: customer_db
+      POSTGRES_USER: moneybee
+      POSTGRES_PASSWORD: moneybee123
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-customer-data:/var/lib/postgresql/data
+    networks:
+      - moneybee-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moneybee -d customer_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  postgres-transfer:
+    image: postgres:16-alpine
+    container_name: moneybee-postgres-transfer
+    environment:
+      POSTGRES_DB: transfer_db
+      POSTGRES_USER: moneybee
+      POSTGRES_PASSWORD: moneybee123
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-transfer-data:/var/lib/postgresql/data
+    networks:
+      - moneybee-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moneybee -d transfer_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: moneybee-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - moneybee-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # RabbitMQ Message Broker
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: moneybee-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: moneybee
+      RABBITMQ_DEFAULT_PASS: moneybee123
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - moneybee-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Seq - Centralized Logging
+  seq:
+    image: datalust/seq:latest
+    container_name: moneybee-seq
+    environment:
+      ACCEPT_EULA: Y
+      SEQ_FIRSTRUN_ADMINPASSWORD: Admin123!
+    ports:
+      - "5341:80"     # Seq UI
+      - "5342:5341"   # Ingestion endpoint
+    volumes:
+      - seq-data:/data
+    networks:
+      - moneybee-network
+    restart: unless-stopped
+
+  # External Services (Required by Case Study)
+  fraud-service:
+    image: bpnpay/fraud-service:latest
+    container_name: moneybee-fraud-service
+    ports:
+      - "8081:80"
+    networks:
+      - moneybee-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  kyc-service:
+    image: bpnpay/kyc-service:latest
+    container_name: moneybee-kyc-service
+    ports:
+      - "8082:80"
+    networks:
+      - moneybee-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  exchange-rate-service:
+    image: bpnpay/exchange-rate-service:latest
+    container_name: moneybee-exchange-rate-service
+    ports:
+      - "8083:80"
+    networks:
+      - moneybee-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  moneybee-network:
+    driver: bridge
+
+volumes:
+  postgres-auth-data:
+  postgres-customer-data:
+  postgres-transfer-data:
+  redis-data:
+  rabbitmq-data:
+  seq-data:

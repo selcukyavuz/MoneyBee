@@ -51,17 +51,19 @@ The system consists of 3 main microservices:
 
 ## 🚀 Setup and Running
 
-### 1. Clone the Repository
+### Production Setup (All services in Docker)
+
+#### 1. Clone the Repository
 
 ```bash
 git clone <repository-url>
 cd MoneyBee
 ```
 
-### 2. Start All Services with Docker Compose
+#### 2. Start All Services with Docker Compose
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 This command starts:
@@ -71,10 +73,61 @@ This command starts:
 - 3x External Services (Fraud, KYC, Exchange Rate)
 - 3x MoneyBee Services (Auth, Customer, Transfer)
 
-### 3. Check Service Status
+#### 3. Check Service Status
 
 ```bash
-docker-compose ps
+docker compose ps
+```
+
+### Development Setup (Recommended for Active Development)
+
+For faster development with hot reload and better debugging:
+
+#### 1. Start Infrastructure Only
+
+```bash
+# Start only databases, Redis, RabbitMQ, and external services
+docker compose -f docker-compose.dev.yml up -d
+
+# Check status
+docker compose -f docker-compose.dev.yml ps
+```
+
+#### 2. Run MoneyBee Services Locally
+
+Open 3 separate terminals and run:
+
+**Terminal 1 - Auth Service:**
+```bash
+dotnet run --project src/Services/MoneyBee.Auth.Service
+```
+
+**Terminal 2 - Customer Service:**
+```bash
+dotnet run --project src/Services/MoneyBee.Customer.Service
+```
+
+**Terminal 3 - Transfer Service:**
+```bash
+dotnet run --project src/Services/MoneyBee.Transfer.Service
+```
+
+#### Benefits of Local Development
+
+✅ **Hot Reload** - Code changes apply immediately without rebuild  
+✅ **Fast Debugging** - Set breakpoints, inspect variables in IDE  
+✅ **Quick Iterations** - No Docker build time (5-10 seconds vs 2-3 minutes)  
+✅ **Better Logs** - See console output directly in terminal  
+✅ **Resource Efficient** - Only infrastructure runs in Docker  
+
+#### Stop Services
+
+```bash
+# Stop infrastructure
+docker compose -f docker-compose.dev.yml down
+
+# Stop all (if using production setup)
+docker compose down
 ```
 
 ### 4. Health Checks
@@ -83,13 +136,25 @@ docker-compose ps
 - Customer Service: http://localhost:5002/health
 - Transfer Service: http://localhost:5003/health
 
-### 5. Swagger UI
+### 5. Access Services
 
-- Auth Service: http://localhost:5001/swagger
-- Customer Service: http://localhost:5002/swagger
-- Transfer Service: http://localhost:5003/swagger
+- **Auth Service Swagger**: http://localhost:5001/swagger
+- **Customer Service Swagger**: http://localhost:5002/swagger
+- **Transfer Service Swagger**: http://localhost:5003/swagger
+- **RabbitMQ Management**: http://localhost:15672 (moneybee/moneybee123)
+- **Seq Logs**: http://localhost:5341 (Admin123!)
 
-### 6. Postman Collection
+### 6. Database Migrations
+
+Migrations run automatically on service startup. To run manually:
+
+```bash
+dotnet ef database update --project src/Services/MoneyBee.Auth.Service
+dotnet ef database update --project src/Services/MoneyBee.Customer.Service
+dotnet ef database update --project src/Services/MoneyBee.Transfer.Service
+```
+
+### 7. Postman Collection
 
 Import `MoneyBee.postman_collection.json` in the project root:
 

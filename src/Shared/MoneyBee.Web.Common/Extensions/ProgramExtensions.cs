@@ -195,7 +195,12 @@ public static class ProgramExtensions
         where TClient : class
         where TImplementation : class, TClient
     {
-        return services.AddHttpClient<TClient, TImplementation>(configureClient)
+        var builder = services.AddHttpClient<TClient, TImplementation>();
+        
+        // Configure the HttpClient for each request
+        builder.ConfigureHttpClient(configureClient);
+        
+        return builder
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
             {
                 PooledConnectionLifetime = TimeSpan.FromMinutes(2)
@@ -217,7 +222,12 @@ public static class ProgramExtensions
         where TClient : class
         where TImplementation : class, TClient
     {
-        return services.AddHttpClient<TClient, TImplementation>(configureClient)
+        var builder = services.AddHttpClient<TClient, TImplementation>();
+        
+        // Configure the HttpClient for each request
+        builder.ConfigureHttpClient(configureClient);
+        
+        return builder
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
             {
                 PooledConnectionLifetime = TimeSpan.FromMinutes(2)
@@ -225,7 +235,7 @@ public static class ProgramExtensions
             .AddPolicyHandler(HttpPolicyExtensions
                 .HandleTransientHttpError()
                 .CircuitBreakerAsync(
-                    handledEventsAllowedBeforeBreaking, 
+                    handledEventsAllowedBeforeBreaking,
                     TimeSpan.FromSeconds(durationOfBreakSeconds)));
     }
 

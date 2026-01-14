@@ -24,19 +24,21 @@ public static class CreateTransferEndpoint
 
     private static async Task<IResult> HandleAsync(
         [FromBody] CreateTransferRequest request,
+        [FromHeader(Name = "X-Idempotency-Key")] string idempotencyKey,
         CreateTransferHandler handler,
         ILogger<Program> logger,
         CancellationToken cancellationToken)
     {
         try
         {
-            var result = await handler.HandleAsync(request, cancellationToken);
+            // Set idempotency key from header to request
+            var requestWithKey = request with { IdempotencyKey = idempotencyKey };
+            var result = await handler.HandleAsync(requestWithKey, cancellationToken);
 
             if (!result.IsSuccess)
                 return result.ToHttpResult();
 
             var response = result.Value!;
-            
             return Results.Created(
                 $"/api/transfers/{response.TransactionCode}",
                 ApiResponse<CreateTransferResponse>.SuccessResponse(response, response.Message));

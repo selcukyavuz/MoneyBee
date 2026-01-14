@@ -5,14 +5,7 @@ using MoneyBee.Common.Abstractions;
 using MoneyBee.Common.Infrastructure.Locking;
 using MoneyBee.Common.Options;
 using MoneyBee.Transfer.Service.Application.Transfers.Options;
-using MoneyBee.Transfer.Service.Application.Transfers;
 using MoneyBee.Transfer.Service.Application.Transfers.Services;
-using MoneyBee.Transfer.Service.Application.Transfers.Commands.CreateTransfer;
-using MoneyBee.Transfer.Service.Application.Transfers.Commands.CancelTransfer;
-using MoneyBee.Transfer.Service.Application.Transfers.Commands.CompleteTransfer;
-using MoneyBee.Transfer.Service.Application.Transfers.Queries.GetTransferByCode;
-using MoneyBee.Transfer.Service.Application.Transfers.Queries.GetCustomerTransfers;
-using MoneyBee.Transfer.Service.Application.Transfers.Queries.CheckDailyLimit;
 using MoneyBee.Transfer.Service.Presentation;
 using MoneyBee.Transfer.Service.Infrastructure.Data;
 using MoneyBee.Transfer.Service.Infrastructure.Messaging;
@@ -20,11 +13,8 @@ using MoneyBee.Transfer.Service.Infrastructure.ExternalServices.CustomerService;
 using MoneyBee.Transfer.Service.Infrastructure.ExternalServices.ExchangeRateService;
 using MoneyBee.Transfer.Service.Infrastructure.ExternalServices.FraudDetectionService;
 using MoneyBee.Web.Common.Extensions;
-using Polly;
-using Polly.Extensions.Http;
 using RabbitMQ.Client;
 using Serilog;
-using StackExchange.Redis;
 
 // PostgreSQL timestamp compatibility
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
@@ -39,16 +29,13 @@ Log.Logger = new LoggerConfiguration()
 builder.Host.UseSerilog();
 
 // Configure Options
-builder.Services.Configure<TransferSettings>(builder.Configuration.GetSection("TransferSettings"));
-builder.Services.Configure<FeeSettings>(builder.Configuration.GetSection("FeeSettings"));
+builder.Services.Configure<TransferSettings>(builder.Configuration.GetSection(ConfigurationKeys.Fee.SectionName));
+builder.Services.Configure<FeeSettings>(builder.Configuration.GetSection(ConfigurationKeys.Fee.SectionName));
 builder.Services.Configure<CustomerServiceOptions>(builder.Configuration.GetSection(ConfigurationKeys.ExternalServices.CustomerService));
 builder.Services.Configure<FraudDetectionServiceOptions>(builder.Configuration.GetSection(ConfigurationKeys.ExternalServices.FraudService));
 builder.Services.Configure<ExchangeRateServiceOptions>(builder.Configuration.GetSection(ConfigurationKeys.ExternalServices.ExchangeRateService));
-builder.Services.Configure<AuthServiceOptions>(
-    builder.Configuration.GetSection("Services:AuthService"));
-builder.Services.Configure<MoneyBee.Common.Options.RabbitMqOptions>(
-    builder.Configuration.GetSection("RabbitMQ"));
-
+builder.Services.Configure<AuthServiceOptions>(builder.Configuration.GetSection(ConfigurationKeys.Services.AuthService));
+builder.Services.Configure<RabbitMqOptions>(builder.Configuration.GetSection(ConfigurationKeys.RabbitMQ.SectionName));
 // Add services to the container
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -67,18 +54,30 @@ builder.Services.AddDbContext<TransferDbContext>(options =>
 builder.Services.AddHttpClientWithRetry<ICustomerService, CustomerService>(
     (sp, client) =>
     {
-        var options = sp.GetRequiredService<IOptions<CustomerServiceOptions>>().Value;
-        client.BaseAddress = new Uri(options.BaseUrl);
-        client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        var configuration = sp.GetRequiredService<IConfiguration>();
+        var baseUrl = configuration["ExternalServices:CustomerService:BaseUrl"];
+        var timeout = configuration.GetValue<int>("ExternalServices:CustomerService:TimeoutSeconds", 10);
+        
+        if (string.IsNullOrEmpty(baseUrl))
+            throw new InvalidOperationException("CustomerService BaseUrl is not configured");
+        
+        client.BaseAddress = new Uri(baseUrl);
+        client.Timeout = TimeSpan.FromSeconds(timeout);
     },
     retryCount: 3);
 
 builder.Services.AddHttpClientWithCircuitBreaker<IFraudDetectionService, FraudDetectionService>(
     (sp, client) =>
     {
-        var options = sp.GetRequiredService<IOptions<FraudDetectionServiceOptions>>().Value;
-        client.BaseAddress = new Uri(options.BaseUrl);
-        client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        var configuration = sp.GetRequiredService<IConfiguration>();
+        var baseUrl = configuration["ExternalServices:FraudService:BaseUrl"];
+        var timeout = configuration.GetValue<int>("ExternalServices:FraudService:TimeoutSeconds", 10);
+        
+        if (string.IsNullOrEmpty(baseUrl))
+            throw new InvalidOperationException("FraudDetectionService BaseUrl is not configured");
+        
+        client.BaseAddress = new Uri(baseUrl);
+        client.Timeout = TimeSpan.FromSeconds(timeout);
     },
     handledEventsAllowedBeforeBreaking: 5,
     durationOfBreakSeconds: 30);
@@ -86,9 +85,15 @@ builder.Services.AddHttpClientWithCircuitBreaker<IFraudDetectionService, FraudDe
 builder.Services.AddHttpClientWithRetry<IExchangeRateService, ExchangeRateService>(
     (sp, client) =>
     {
-        var options = sp.GetRequiredService<IOptions<ExchangeRateServiceOptions>>().Value;
-        client.BaseAddress = new Uri(options.BaseUrl);
-        client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        var configuration = sp.GetRequiredService<IConfiguration>();
+        var baseUrl = configuration["ExternalServices:ExchangeRateService:BaseUrl"];
+        var timeout = configuration.GetValue<int>("ExternalServices:ExchangeRateService:TimeoutSeconds", 10);
+        
+        if (string.IsNullOrEmpty(baseUrl))
+            throw new InvalidOperationException("ExchangeRateService BaseUrl is not configured");
+        
+        client.BaseAddress = new Uri(baseUrl);
+        client.Timeout = TimeSpan.FromSeconds(timeout);
     },
     retryCount: 3);
 
@@ -104,7 +109,7 @@ builder.Services.AddRepositories(transferAssembly);
 builder.Services.AddInfrastructureServices(transferAssembly);
 
 // Singleton Services
-builder.Services.AddSingleton<MoneyBee.Transfer.Service.Application.Transfers.Services.ITransactionCodeGenerator, 
+builder.Services.AddSingleton<ITransactionCodeGenerator, 
     MoneyBee.Transfer.Service.Infrastructure.Transfers.Services.TransactionCodeGenerator>();
 
 // Redis

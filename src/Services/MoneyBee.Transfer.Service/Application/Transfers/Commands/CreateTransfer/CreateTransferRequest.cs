@@ -8,5 +8,5 @@ public record CreateTransferRequest
     public string ReceiverNationalId { get; init; } = string.Empty;
     public decimal Amount { get; init; }
     public Currency Currency { get; init; } = Currency.TRY;
-    public string? IdempotencyKey { get; init; }
+    public string IdempotencyKey { get; init; } = string.Empty;
 }
